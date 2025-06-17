@@ -1,0 +1,132 @@
+# 华为 AI Edge 智能小站 - 视觉识别算法系统配置文件
+
+# 系统基础配置
+system:
+  device_id: "atlas_500_001"            # 设备ID
+  log_level: "INFO"  # 日志级别: DEBUG, INFO, WARNING, ERROR
+  max_workers: 4  # 最大工作线程数
+  location: "监控区域A"                  # 设备位置
+  description: "华为AI Edge智能小站视觉识别系统"  # 系统描述
+  version: "1.0.0"                      # 系统版本
+  auto_restart: true                    # 是否自动重启
+  health_check_interval: 30             # 健康检查间隔(秒)
+
+# 模型配置
+model:
+  path: "/app/models/model.om"  # 模型文件路径（容器内）
+  input_width: 640  # 模型输入宽度
+  input_height: 640  # 模型输入高度
+  batch_size: 1  # 批处理大小
+  confidence_threshold: 0.5  # 全局置信度阈值
+  nms_threshold: 0.4  # NMS阈值
+  model_id: "yolov5"                    # 默认模型ID
+  preset_id: "balanced"                 # 默认预设ID
+  models_config_path: "config/models.yml"  # 模型配置文件路径
+
+# 目标类别配置
+classes:
+  - name: "person"
+    threshold: 0.6  # 单独阈值
+    color: [255, 0, 0]  # BGR颜色
+  - name: "car"
+    threshold: 0.5
+    color: [0, 255, 0]
+  - name: "truck"
+    threshold: 0.5
+    color: [0, 0, 255]
+
+# 视频输入配置
+video:
+  source: "rtsp://localhost:554/stream"  # 视频源地址
+  # source: "/dev/video0"  # USB摄像头
+  # source: "/app/videos/test.mp4"  # 本地视频文件
+  fps: 30                                # 目标帧率
+  width: 1920  # 视频宽度
+  height: 1080  # 视频高度
+  buffer_size: 3                        # 缓冲区大小
+  reconnect_delay_seconds: 5            # 视频流断开后的重连延迟(秒)
+  max_reconnect_attempts: 10            # 最大重连尝试次数
+  timeout: 10                           # 连接超时(秒)
+
+# 告警配置
+alert:
+  confidence_threshold: 0.5             # 置信度阈值
+  debounce_time: 5                      # 告警防抖时间(秒)
+  save_images: true                     # 是否保存告警图片
+  image_save_path: "alerts"             # 告警图片保存路径
+  max_saved_images: 1000                # 最大保存图片数量
+  image_quality: 95                     # 图片质量(1-100)
+
+# MQTT配置
+mqtt:
+  enabled: true
+  broker: "localhost"
+  port: 1883
+  username: ""
+  password: ""
+  topic: "vision/alerts"
+  qos: 1
+  keepalive: 60
+
+# HTTP配置
+http:
+  enabled: false
+  url: "http://localhost:8080/api/alerts"
+  method: "POST"
+  headers:
+    Content-Type: "application/json"
+  timeout: 10
+
+# RabbitMQ配置
+rabbitmq:
+  enabled: false
+  host: "localhost"
+  port: 5672
+  username: "guest"
+  password: "guest"
+  exchange: "vision.alerts"
+  routing_key: "detection"
+
+# Kafka配置
+kafka:
+  enabled: false
+  bootstrap_servers: ["localhost:9092"]
+  topic: "vision-alerts"
+  acks: "all"
+
+# 可视化配置
+visualization:
+  enabled: true                         # 是否启用可视化
+  window_name: "Vision System"          # 窗口名称
+  show_fps: true                        # 显示FPS
+  show_confidence: true                 # 显示置信度
+  show_class_names: true                # 显示类别名称
+  show_bbox: true                       # 显示边界框
+  bbox_color: [0, 255, 0]              # 边界框颜色(BGR)
+  text_color: [255, 255, 255]          # 文字颜色(BGR)
+  font_scale: 0.6                       # 字体大小
+  thickness: 2                          # 线条粗细
+
+# 日志配置
+logging:
+  level: "INFO"                         # 日志级别
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "logs/vision_system.log"        # 日志文件路径
+  max_size: 100                         # 单个日志文件最大大小(MB)
+  backup_count: 5                       # 备份文件数量
+  console_output: true                  # 是否输出到控制台
+
+# 性能配置
+performance:
+  max_fps: 30                           # 最大处理帧率
+  batch_size: 1                         # 批处理大小
+  num_threads: 4                        # 线程数量
+  gpu_memory_fraction: 0.8              # GPU内存使用比例
+  enable_profiling: false               # 是否启用性能分析
+
+# 容器环境配置
+container:
+  model_mount_path: "/opt/models"       # 模型挂载路径
+  data_mount_path: "/opt/data"          # 数据挂载路径
+  config_mount_path: "/opt/config"      # 配置挂载路径
+  log_mount_path: "/opt/logs"           # 日志挂载路径 

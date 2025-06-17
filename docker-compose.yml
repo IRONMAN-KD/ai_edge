@@ -1,0 +1,236 @@
+version: '3.8'
+
+services:
+  atlas-vision-system:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: atlas-vision-system
+    restart: unless-stopped
+    
+    # 环境变量
+    environment:
+      - CONTAINER_ENV=true
+      - ASCEND_DEVICE_ID=0
+      - PYTHONPATH=/app
+      - IMAGE_BASE_URL=http://localhost:8080/images
+      - MODEL_VOLUME_PATH=/app/models
+      - ALERT_IMAGE_VOLUME_PATH=/app/alert_images
+      - CONFIG_VOLUME_PATH=/app/config
+    
+    # 设备映射（Atlas NPU）
+    devices:
+      - /dev/davinci0:/dev/davinci0
+      - /dev/davinci_manager:/dev/davinci_manager
+      - /dev/hisi_hdc:/dev/hisi_hdc
+    
+    # 卷挂载
+    volumes:
+      # 配置文件
+      - ./config:/app/config:ro
+      # 模型文件
+      - ./models:/app/models:ro
+      # 告警图片
+      - ./alert_images:/app/alert_images
+      # 日志文件
+      - ./logs:/app/logs
+      # 视频文件（可选）
+      - ./videos:/app/videos:ro
+      # 系统日志
+      - /var/log:/host/var/log:ro
+    
+    # 网络配置
+    network_mode: host
+    
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '2.0'
+        reservations:
+          memory: 2G
+          cpus: '1.0'
+    
+    # 健康检查
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    
+    # 日志配置
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    # 安全配置
+    security_opt:
+      - no-new-privileges:true
+    
+    # 特权模式（如果需要访问硬件设备）
+    privileged: false
+    
+    # 用户和组
+    user: "atlas:atlas"
+    
+    # 工作目录
+    working_dir: /app
+    
+    # 命令覆盖
+    command: ["python3", "main.py", "--config", "/app/config/config.yml"]
+    
+    # 依赖服务（如果有其他服务）
+    # depends_on:
+    #   - mqtt-broker
+    #   - redis
+
+  # MQTT Broker 服务（可选）
+  mqtt-broker:
+    image: eclipse-mosquitto:2.0
+    container_name: atlas-mqtt-broker
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./mqtt/config:/mosquitto/config:ro
+      - ./mqtt/data:/mosquitto/data
+      - ./mqtt/log:/mosquitto/log
+    networks:
+      - atlas-network
+    profiles:
+      - mqtt
+
+  # Redis 服务（可选，用于缓存）
+  redis:
+    image: redis:7-alpine
+    container_name: atlas-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./redis/data:/data
+    networks:
+      - atlas-network
+    profiles:
+      - cache
+
+  # Web 管理界面（可选）
+  web-ui:
+    image: nginx:alpine
+    container_name: atlas-web-ui
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - ./web:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - atlas-network
+    profiles:
+      - web
+
+  mysql:
+    image: mysql:8.0
+    container_name: ai_edge_mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-ai_edge}
+      MYSQL_USER: ${MYSQL_USER:-ai_edge}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-ai_edge}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "3306:3306"
+    networks:
+      - ai_edge_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    container_name: ai_edge_api
+    restart: always
+    environment:
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_USER=${MYSQL_USER:-ai_edge}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-ai_edge}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-ai_edge}
+      - JWT_SECRET=${JWT_SECRET:-your-secret-key}
+    volumes:
+      - ./api:/app
+      - ./models:/app/models
+    ports:
+      - "8000:8000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - ai_edge_network
+
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    container_name: ai_edge_web
+    restart: always
+    environment:
+      - API_URL=http://api:8000
+    volumes:
+      - ./web:/app
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+    networks:
+      - ai_edge_network
+
+  inference:
+    build:
+      context: .
+      dockerfile: inference/Dockerfile
+    container_name: ai_edge_inference
+    restart: always
+    environment:
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_USER=${MYSQL_USER:-ai_edge}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-ai_edge}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-ai_edge}
+    volumes:
+      - ./inference:/app
+      - ./models:/app/models
+    ports:
+      - "5001:5001"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - ai_edge_network
+
+networks:
+  atlas-network:
+    driver: bridge
+  ai_edge_network:
+    driver: bridge
+
+volumes:
+  alert_images:
+    driver: local
+  logs:
+    driver: local
+  models:
+    driver: local
+  mysql_data: 
