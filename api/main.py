@@ -1,8 +1,15 @@
-import mysql.connector.locales.eng.client_error
 import os
 import sys
+
+# Add project root to Python path first
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+import mysql.connector.locales.eng.client_error
 import traceback
 from datetime import datetime, timedelta
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, HTTPException, status, Request, File, UploadFile, Form, WebSocket, WebSocketDisconnect, Query
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,7 +17,7 @@ from typing import Optional, List, Any, Dict
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from dotenv import load_dotenv
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse, FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 import cv2
 import asyncio
@@ -31,10 +38,17 @@ from apscheduler.triggers.cron import CronTrigger
 import requests
 import uuid
 import pytz
+from database.database import DatabaseManager
+from database.repositories import (
+    UserRepository, ModelRepository, InferenceRepository, 
+    TaskRepository, AlertRepository, SystemConfigRepository
+)
+from api.models.factory import ModelFactory
+from components.push_notification import PushNotificationService
 
 # Add project root to Python path first
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, project_root)
+# project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# sys.path.insert(0, project_root)
 
 # Define absolute path for alert images
 ALERT_IMAGE_DIR = os.path.join(project_root, "alert_images")
@@ -53,7 +67,52 @@ from api.models.factory import ModelFactory
 
 load_dotenv()
 
-app = FastAPI(title="AI Edge API")
+def cleanup_job():
+    print("Running daily cleanup job for old alerts...")
+    config_repo = SystemConfigRepository()
+    alert_repo = AlertRepository()
+    
+    retention_config = config_repo.get_config('alert_retention')
+    
+    if retention_config and retention_config.get('enabled'):
+        days_to_keep = retention_config.get('days', 30)
+        try:
+            deleted_count = alert_repo.delete_alerts_older_than(days_to_keep, ALERT_IMAGE_DIR)
+            if deleted_count > 0:
+                print(f"Successfully deleted {deleted_count} old alert(s).")
+        except Exception as e:
+            print(f"Error during alert cleanup job: {e}")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup logic
+    print("--- FastAPI App Startup ---")
+    
+    # Add cleanup job to scheduler
+    scheduler.add_job(cleanup_job, CronTrigger(hour=0, minute=0, timezone='Asia/Shanghai'))
+    
+    # Start the APScheduler
+    if not scheduler.running:
+        scheduler.start()
+        print("APScheduler started for tasks and cleanup.")
+    
+    # Start the detection listener in the background
+    asyncio.create_task(listen_for_detections())
+    
+    # Sync tasks from DB
+    sync_and_schedule_all_tasks()
+    print("--- Scheduler and services are running ---")
+    
+    yield
+    
+    # Shutdown logic
+    print("--- FastAPI App Shutdown ---")
+    if scheduler.running:
+        scheduler.shutdown()
+        print("APScheduler shut down.")
+
+
+app = FastAPI(title="AI Edge API", lifespan=lifespan)
 scheduler = BackgroundScheduler(timezone="Asia/Shanghai")
 
 # IPC Queue for detection results from background processes
@@ -134,6 +193,9 @@ def get_inference_repository():
 def get_alert_repository():
     return AlertRepository()
 
+def get_system_config_repository():
+    return SystemConfigRepository()
+
 # 工具函数
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
@@ -142,6 +204,13 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     else:
         expire = datetime.utcnow() + timedelta(minutes=15)
     to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+def create_image_access_token(image_name: str, expires_minutes: int = 5) -> str:
+    """Creates a short-lived JWT for accessing a specific image."""
+    expire = datetime.utcnow() + timedelta(minutes=expires_minutes)
+    to_encode = {"sub": image_name, "exp": expire, "scope": "image_access"}
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
@@ -582,7 +651,11 @@ def run_task_in_background(task_id: int, q: Queue):
                                         video_name=source.get('name', 'Unknown Camera')
                                     )
                                 )
-                                alert_repo.create_alert(alert_create)
+                                new_alert = alert_repo.create_alert(alert_create)
+                                
+                                # Trigger push notification
+                                if new_alert:
+                                    trigger_push_notification_from_background(new_alert)
 
                 # Wait for the specified interval before processing the next frame
                 time.sleep(current_task.inference_interval)
@@ -616,6 +689,32 @@ def start_background_task(task_id: int):
     process.start()
     print(f"Started background process for task {task_id} with PID {process.pid}.")
 
+
+def trigger_push_notification_from_background(alert: Alert):
+    """
+    A helper function to be called from a background process.
+    It creates its own repository instances to fetch configs and trigger a notification.
+    """
+    print(f"Background trigger for push notification for alert ID: {alert.id}")
+    try:
+        config_repo = SystemConfigRepository()
+        all_configs = config_repo.get_all_configs()
+        
+        notifier = PushNotificationService(all_configs)
+        
+        # Manually construct the full image URL
+        base_url = all_configs.get("system_base_url", "http://localhost:5001")
+        image_name = os.path.basename(alert.alert_image)
+        image_token = create_image_access_token(image_name)
+        image_url = f"{base_url.rstrip('/')}/system/image/{image_name}?token={image_token}"
+        
+        alert_dict = alert.model_dump(mode='json')
+        alert_dict['alert_image_url'] = image_url
+        
+        notifier.send_notification(alert_dict)
+    except Exception as e:
+        print(f"ERROR: Failed to trigger push notification from background: {e}")
+        traceback.print_exc()
 
 def schedule_task(task: Task, task_repo: TaskRepository):
     """Schedules a task based on its cron settings."""
@@ -737,20 +836,6 @@ def sync_and_schedule_all_tasks():
                 start_background_task(task.id)
 
 
-@app.on_event("startup")
-def start_scheduler():
-    """Start the scheduler and the detection listener on app startup."""
-    print("--- FastAPI App Startup ---")
-    # Start the detection listener in the background
-    asyncio.create_task(listen_for_detections())
-    
-    # Start the APScheduler
-    scheduler.start()
-    
-    # Sync tasks from DB
-    sync_and_schedule_all_tasks()
-    print("--- Scheduler and services are running ---")
-
 # 任务路由
 @app.post("/tasks", response_model=Task)
 async def create_task(
@@ -848,18 +933,48 @@ async def delete_task(
     if not success:
         raise HTTPException(status_code=404, detail="Task not found")
 
-async def generate_mjpeg_stream(source: str):
+# This is a simplified, non-blocking way to run the notification
+def trigger_push_notification(config_repo: SystemConfigRepository, alert: Alert, request: Request):
+    all_configs = config_repo.get_all_configs()
+    notifier = PushNotificationService(all_configs)
+    
+    # Construct the full image URL with a temporary access token
+    image_name = os.path.basename(alert.alert_image)
+    image_token = create_image_access_token(image_name)
+    image_url = f"{str(request.base_url).rstrip('/')}/system/image/{image_name}?token={image_token}"
+    
+    # Convert alert model to dict and add the full image URL
+    alert_dict = alert.model_dump(mode='json')
+    alert_dict['alert_image_url'] = image_url
+    
+    notifier.send_notification(alert_dict)
+
+
+async def process_video_stream(video_path: str, task: Task):
+    # ... existing code ...
+                    # Save alert to database
+                    alert_repo = get_alert_repository()
+                    new_alert = alert_repo.create_alert(alert_create)
+                    
+                    # Trigger push notification
+                    # config_repo = get_system_config_repository()
+                    # trigger_push_notification(config_repo, new_alert, request)
+
+                    update_last_alert_info(task_id, detection_summary)
+    # ... existing code ...
+
+async def generate_mjpeg_stream(task_id: int, request: Request, current_user: User = Depends(get_current_user)):
     """
     Generates an MJPEG stream from a video source.
     This is a single-shot generator that handles client disconnections gracefully.
     """
     cap = None
     try:
-        logging.info(f"Opening MJPEG stream for: {source}")
-        cap = cv2.VideoCapture(source, cv2.CAP_FFMPEG)
+        logging.info(f"Opening MJPEG stream for: {task_id}")
+        cap = cv2.VideoCapture(task_id, cv2.CAP_FFMPEG)
         if not cap.isOpened():
             error_msg = "Could not open video source."
-            logging.error(f"{error_msg} ({source})")
+            logging.error(f"{error_msg} ({task_id})")
             frame = np.zeros((480, 640, 3), dtype=np.uint8)
             cv2.putText(frame, error_msg, (50, 240), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
             _, buffer = cv2.imencode('.jpg', frame)
@@ -870,7 +985,7 @@ async def generate_mjpeg_stream(source: str):
         while True:
             ret, frame = cap.read()
             if not ret:
-                logging.warning(f"Lost connection to video stream: {source}. Stopping stream.")
+                logging.warning(f"Lost connection to video stream: {task_id}. Stopping stream.")
                 break
 
             _, buffer = cv2.imencode('.jpg', frame)
@@ -879,13 +994,13 @@ async def generate_mjpeg_stream(source: str):
             await asyncio.sleep(1/30) # Control frame rate
 
     except asyncio.CancelledError:
-        logging.info(f"Client disconnected from stream: {source}. Closing resources.")
+        logging.info(f"Client disconnected from stream: {task_id}. Closing resources.")
     except Exception as e:
-        logging.error(f"An unexpected error occurred in MJPEG stream for {source}: {e}")
+        logging.error(f"An unexpected error occurred in MJPEG stream for {task_id}: {e}")
     finally:
         if cap and cap.isOpened():
             cap.release()
-            logging.info(f"Video capture for {source} released.")
+            logging.info(f"Video capture for {task_id} released.")
 
 
 @app.get("/tasks/{task_id}/stream")
@@ -905,7 +1020,7 @@ async def mjpeg_video_stream(
     video_source_url = task.video_sources[0]['url']
     
     return StreamingResponse(
-        generate_mjpeg_stream(video_source_url),
+        generate_mjpeg_stream(task_id, request, current_user),
         media_type='multipart/x-mixed-replace; boundary=frame'
     )
 
@@ -1083,6 +1198,79 @@ async def get_dashboard_stats(
         "latest_alerts": latest_alerts,
     }
 
+# System Config Routes
+@app.get("/system/configs")
+async def get_system_configs(
+    current_user: User = Depends(get_current_user),
+    config_repo: SystemConfigRepository = Depends(get_system_config_repository)
+):
+    return config_repo.get_all_configs()
+
+@app.put("/system/configs")
+async def update_system_configs(
+    configs: Dict[str, Any],
+    current_user: User = Depends(get_current_user),
+    config_repo: SystemConfigRepository = Depends(get_system_config_repository)
+):
+    config_repo.update_configs(configs)
+    return {"message": "System configurations updated successfully."}
+
+async def verify_image_access(
+    request: Request,
+    image_name: str,
+    token: Optional[str] = Query(None),
+    user_repo: UserRepository = Depends(get_user_repository)
+):
+    """Dependency to verify access to an image via user session or a query token."""
+    # 1. Try standard user authentication (for frontend access)
+    auth_header = request.headers.get("Authorization")
+    if auth_header:
+        try:
+            parts = auth_header.split()
+            if parts[0].lower() == "bearer" and len(parts) == 2:
+                jwt_token = parts[1]
+                payload = jwt.decode(jwt_token, SECRET_KEY, algorithms=[ALGORITHM])
+                username: str = payload.get("sub")
+                if username and user_repo.get_user_by_username(username):
+                    logging.info(f"Image access for '{image_name}' granted via user session for '{username}'.")
+                    return # User is authenticated, grant access
+        except (JWTError, IndexError):
+            # If header is present but invalid, fall through to token check
+            pass
+            
+    # 2. If no valid user auth, try token-based auth (for external service)
+    token_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid or missing token for image access",
+    )
+    if token is None:
+        raise token_exception
+
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        token_sub: str = payload.get("sub")
+        token_scope: str = payload.get("scope")
+        
+        # Ensure the token is for the requested image and has the correct scope
+        if token_sub != image_name or token_scope != "image_access":
+            raise token_exception
+        
+        logging.info(f"Image access for '{image_name}' granted via query token.")
+        return # Token is valid for this image, grant access
+    except JWTError:
+        raise token_exception
+
+# External Image Access Route
+@app.get("/system/image/{image_name}")
+async def get_alert_image(image_name: str, access: bool = Depends(verify_image_access)):
+    # The `verify_image_access` dependency handles all authentication.
+    # If it succeeds, `access` will be True (or the principal), and we can proceed.
+    # If it fails, it will have already raised an HTTPException.
+    image_path = os.path.join(ALERT_IMAGE_DIR, image_name)
+    if os.path.exists(image_path):
+        return FileResponse(image_path)
+    return Response(status_code=404, content="Image not found")
+
 if __name__ == '__main__':
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=5001) 
+    uvicorn.run("api.main:app", host="0.0.0.0", port=5001, reload=True) 

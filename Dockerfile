@@ -1,10 +1,37 @@
 # AI Edge 视觉识别系统 Dockerfile
 # 基于华为 Atlas 官方基础镜像
 
-FROM python:3.8-slim
+# Stage 1: Base Image
+FROM python:3.9-slim
 
-# 设置工作目录
+# Set working directory
 WORKDIR /app
+
+# Set environment variables to prevent Python from writing pyc files
+ENV PYTHONDONTWRITEBYTECODE 1
+# Ensure Python output is sent straight to the terminal without buffering
+ENV PYTHONUNBUFFERED 1
+
+# Install system dependencies that might be needed by Python packages
+# For example, if you were using a library that needed gcc
+# RUN apt-get update && apt-get install -y gcc && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements first to leverage Docker cache
+COPY requirements.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Copy the rest of the application code
+COPY . .
+
+# Expose the port the app runs on
+EXPOSE 5001
+
+# Define the command to run the application
+# Use the reloader in development, but not in production
+CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "5001"]
 
 # 设置环境变量
 ENV PYTHONPATH=/app:$PYTHONPATH
@@ -53,13 +80,6 @@ RUN apt-get update && apt-get install -y \
     htop \
     && rm -rf /var/lib/apt/lists/*
 
-# 升级 pip
-RUN python3 -m pip install --upgrade pip
-
-# 复制依赖文件并安装 Python 依赖
-COPY requirements.txt .
-RUN pip3 install --no-cache-dir -r requirements.txt
-
 # 创建必要的目录
 RUN mkdir -p /app/config \
     /app/models \
@@ -68,9 +88,6 @@ RUN mkdir -p /app/config \
     /app/videos \
     /app/tests
 
-# 复制项目文件
-COPY . .
-
 # 设置文件权限
 RUN chmod +x main.py
 
@@ -78,9 +95,6 @@ RUN chmod +x main.py
 RUN groupadd -r atlas && useradd -r -g atlas atlas
 RUN chown -R atlas:atlas /app
 USER atlas
-
-# 暴露端口（如果需要 HTTP 服务）
-EXPOSE 8080
 
 # 健康检查
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \

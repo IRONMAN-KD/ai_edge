@@ -23,6 +23,11 @@ load_dotenv()
 class DatabaseManager:
     _pool = None
 
+    def __init__(self):
+        self._get_pool()
+        self.connection = None
+        self.cursor = None
+
     @classmethod
     def _get_pool(cls):
         if cls._pool is None:
@@ -43,7 +48,43 @@ class DatabaseManager:
                 raise
         return cls._pool
 
+    def start_transaction(self):
+        """Starts a new database transaction."""
+        self.connection = self._get_pool().get_connection()
+        self.connection.start_transaction()
+        self.cursor = self.connection.cursor(dictionary=True)
+
+    def commit(self):
+        """Commits the current transaction."""
+        if self.connection:
+            self.connection.commit()
+
+    def rollback(self):
+        """Rolls back the current transaction."""
+        if self.connection:
+            self.connection.rollback()
+
+    def close_transaction(self):
+        """Closes the cursor and connection."""
+        if self.cursor:
+            self.cursor.close()
+            self.cursor = None
+        if self.connection:
+            self.connection.close()
+            self.connection = None
+
     def execute_query(self, query: str, params: Optional[tuple] = None, fetch: Optional[str] = "all", commit: bool = False, last_row_id: bool = False) -> Any:
+        # If in a transaction, use the existing cursor
+        if self.cursor:
+            self.cursor.execute(query, params or ())
+            if fetch == 'one':
+                return self.cursor.fetchone()
+            elif fetch == 'all':
+                return self.cursor.fetchall()
+            else: # fetch is None or something else
+                return self.cursor.rowcount
+
+        # Original logic for non-transactional queries
         pool = self._get_pool()
         connection = None
         try:

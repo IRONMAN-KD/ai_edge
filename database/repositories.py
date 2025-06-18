@@ -4,6 +4,7 @@ from .models import User, UserCreate, Model, ModelCreate, ModelUpdate, Inference
 from passlib.context import CryptContext
 import json
 from datetime import timedelta, datetime
+import os
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -443,8 +444,8 @@ class AlertRepository:
 
     def update_alert_status(self, alert_id: int, status: str, remark: Optional[str] = None) -> Optional[Alert]:
         # This is a simplified update. A real implementation might involve logging the change.
-        query = "UPDATE alerts SET status = %s WHERE id = %s"
-        params = [status, alert_id]
+        query = "UPDATE alerts SET status = %s, remark = %s WHERE id = %s"
+        params = [status, remark, alert_id]
         self.db.execute_query(query, tuple(params), commit=True)
         return self.get_alert_by_id(alert_id)
 
@@ -485,6 +486,65 @@ class AlertRepository:
         result = self.db.execute_query(query, tuple(params), fetch='all')
         return [Alert(**row) for row in result] if result else []
 
+    def delete_alerts_older_than(self, days: int, alert_image_dir: str) -> int:
+        """
+        Safely deletes alerts older than a specified number of days and their associated image files.
+        This operation is transactional for the database part.
+        """
+        cutoff_date = datetime.utcnow() - timedelta(days=days)
+        
+        alerts_to_delete = []
+        
+        try:
+            # Start a transaction to ensure atomicity for database operations
+            self.db.start_transaction()
+
+            # Step 1: Select the alerts to be deleted to get their image filenames
+            query_select = "SELECT id, alert_image FROM alerts WHERE created_at < %s"
+            alerts_to_delete = self.db.execute_query(query_select, (cutoff_date,), fetch='all')
+
+            if not alerts_to_delete:
+                self.db.commit() # Nothing to do, but commit to close transaction
+                return 0
+
+            # Step 2: Delete alert records from the database
+            alert_ids_to_delete = [alert['id'] for alert in alerts_to_delete]
+            placeholders = ', '.join(['%s'] * len(alert_ids_to_delete))
+            query_delete = f"DELETE FROM alerts WHERE id IN ({placeholders})"
+            
+            self.db.execute_query(query_delete, tuple(alert_ids_to_delete))
+
+            # Step 3: Commit the transaction
+            self.db.commit()
+            
+        except Exception as e:
+            print(f"Error during database transaction for alert deletion, rolling back. Error: {e}")
+            self.db.rollback()
+            return 0 # Return 0 as no alerts were successfully deleted
+        finally:
+            self.db.close_transaction()
+
+        # Step 4: After successful DB deletion, delete the image files
+        deleted_count = len(alerts_to_delete)
+        print(f"Successfully deleted {deleted_count} alert records from the database. Now deleting image files.")
+
+        for alert in alerts_to_delete:
+            if alert.get('alert_image'):
+                # Construct a safe path, preventing traversal attacks
+                image_filename = os.path.basename(alert['alert_image'])
+                image_path = os.path.join(alert_image_dir, image_filename)
+                
+                if os.path.exists(image_path):
+                    try:
+                        os.remove(image_path)
+                        print(f"Deleted image file: {image_path}")
+                    except OSError as e:
+                        print(f"Error deleting image file {image_path}: {e}")
+                else:
+                    print(f"Image file not found, skipping: {image_path}")
+                    
+        return deleted_count
+
 class InferenceRepository:
     def __init__(self):
         self.db = DatabaseManager()
@@ -518,4 +578,58 @@ class InferenceRepository:
     def get_user_records(self, user_id: int) -> List[InferenceRecord]:
         query = "SELECT * FROM inference_records WHERE user_id = %s"
         result = self.db.execute_query(query, (user_id,), fetch='all')
-        return [InferenceRecord(**row) for row in result] 
+        return [InferenceRecord(**row) for row in result]
+
+class SystemConfigRepository:
+    def __init__(self):
+        self.db = DatabaseManager()
+
+    def get_all_configs(self) -> Dict[str, Any]:
+        query = "SELECT `key`, `value` FROM system_configs"
+        results = self.db.execute_query(query, fetch='all')
+        
+        configs = {}
+        for row in results:
+            try:
+                # Attempt to parse value as JSON, otherwise keep as string
+                configs[row['key']] = json.loads(row['value'])
+            except (json.JSONDecodeError, TypeError):
+                configs[row['key']] = row['value']
+        return configs
+
+    def get_config(self, key: str) -> Optional[Dict[str, Any]]:
+        query = "SELECT `value` FROM system_configs WHERE `key` = %s"
+        result = self.db.execute_query(query, (key,), fetch='one')
+        if result and result['value']:
+            try:
+                return json.loads(result['value'])
+            except (json.JSONDecodeError, TypeError):
+                return result['value']
+        return None
+
+    def update_configs(self, configs: Dict[str, Any]) -> None:
+        """Updates multiple system configurations within a single transaction."""
+        try:
+            self.db.start_transaction()
+            
+            for key, value in configs.items():
+                # Serialize complex types (dict, list) to a JSON string
+                value_to_store = json.dumps(value) if isinstance(value, (dict, list)) else str(value)
+                
+                # Use INSERT ... ON DUPLICATE KEY UPDATE to handle both new and existing keys
+                query = """
+                INSERT INTO system_configs (`key`, `value`)
+                VALUES (%s, %s)
+                ON DUPLICATE KEY UPDATE `value` = %s
+                """
+                params = (key, value_to_store, value_to_store)
+                self.db.execute_query(query, params)
+            
+            self.db.commit()
+            
+        except Exception as e:
+            print(f"Error updating system configurations, rolling back transaction. Error: {e}")
+            self.db.rollback()
+            raise e # Re-raise the exception to be handled by the caller
+        finally:
+            self.db.close_transaction() 

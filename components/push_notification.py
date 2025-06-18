@@ -9,6 +9,8 @@ import threading
 from typing import Dict, Any, List, Optional
 from utils.logging import logger
 from utils.config_parser import ConfigParser
+import requests
+import logging
 
 try:
     import paho.mqtt.client as mqtt
@@ -16,13 +18,6 @@ try:
 except ImportError:
     MQTT_AVAILABLE = False
     logger.warning("MQTT 库未安装")
-
-try:
-    import requests
-    REQUESTS_AVAILABLE = True
-except ImportError:
-    REQUESTS_AVAILABLE = False
-    logger.warning("Requests 库未安装")
 
 try:
     import pika
@@ -33,10 +28,10 @@ except ImportError:
 
 try:
     from kafka import KafkaProducer
-    KAFKA_AVAILABLE = True
+    KAFKA_PYTHON_AVAILABLE = True
 except ImportError:
-    KAFKA_AVAILABLE = False
-    logger.warning("Kafka 库未安装")
+    KAFKA_PYTHON_AVAILABLE = False
+    logging.warning("kafka-python library not installed, Kafka push will not be available.")
 
 
 class MQTTPusher:
@@ -156,13 +151,12 @@ class HTTPPusher:
         self.config = config
         self.session = None
         
-        if REQUESTS_AVAILABLE:
+        if requests.Session:
             self._init_session()
     
     def _init_session(self):
         """初始化 HTTP 会话"""
         try:
-            import requests
             self.session = requests.Session()
             
             # 设置默认头部
@@ -181,7 +175,7 @@ class HTTPPusher:
     
     def push(self, alert_info: Dict[str, Any]) -> bool:
         """推送告警信息"""
-        if not REQUESTS_AVAILABLE or not self.session:
+        if not requests.Session or not self.session:
             return False
         
         try:
@@ -292,7 +286,7 @@ class KafkaPusher:
         self.config = config
         self.producer = None
         
-        if KAFKA_AVAILABLE:
+        if KAFKA_PYTHON_AVAILABLE:
             self._init_producer()
     
     def _init_producer(self):
@@ -314,7 +308,7 @@ class KafkaPusher:
     
     def push(self, alert_info: Dict[str, Any]) -> bool:
         """推送告警信息"""
-        if not KAFKA_AVAILABLE or not self.producer:
+        if not KAFKA_PYTHON_AVAILABLE or not self.producer:
             return False
         
         try:
@@ -338,6 +332,49 @@ class KafkaPusher:
         if self.producer:
             self.producer.close()
 
+    def _send_kafka_notification(self, alert_data: Dict[str, Any]):
+        if not KAFKA_PYTHON_AVAILABLE:
+            logging.error("Kafka push is enabled, but 'kafka-python' library is not installed.")
+            return
+
+        servers = self.config.get('kafka_bootstrap_servers')
+        topic = self.config.get('kafka_topic')
+
+        if not servers or not topic:
+            logging.error("Kafka push is enabled, but bootstrap servers or topic is not configured.")
+            return
+
+        logging.info(f"Sending Kafka notification to topic '{topic}' on servers '{servers}'")
+        
+        producer = None
+        try:
+            producer = KafkaProducer(
+                bootstrap_servers=servers.split(','),
+                value_serializer=lambda v: json.dumps(v, ensure_ascii=False).encode('utf-8'),
+                # Add a timeout for producer to avoid blocking indefinitely
+                request_timeout_ms=5000 
+            )
+            
+            # Send the message
+            future = producer.send(topic, value=alert_data)
+            
+            # Block for 'synchronous' sends
+            record_metadata = future.get(timeout=10)
+            
+            logging.info(
+                f"Kafka notification sent successfully. "
+                f"Topic: {record_metadata.topic}, Partition: {record_metadata.partition}, "
+                f"Offset: {record_metadata.offset}"
+            )
+
+        except Exception as e:
+            logging.error(f"Failed to send Kafka notification. Error: {e}")
+        finally:
+            if producer:
+                producer.flush()
+                producer.close()
+                logging.info("Kafka producer closed.")
+
 
 class PushNotificationManager:
     """推送通知管理器"""
@@ -353,7 +390,7 @@ class PushNotificationManager:
     def _init_pushers(self):
         """初始化推送器"""
         # MQTT 推送器
-        mqtt_config = config.get_mqtt_config()
+        mqtt_config = self.config.get_mqtt_config()
         if mqtt_config.get('enabled', False):
             self.pushers['mqtt'] = MQTTPusher(mqtt_config)
             if self.pushers['mqtt'].connect():
@@ -362,19 +399,19 @@ class PushNotificationManager:
                 logger.warning("MQTT 推送器连接失败")
         
         # HTTP 推送器
-        http_config = config.get_http_config()
+        http_config = self.config.get_http_config()
         if http_config.get('enabled', False):
             self.pushers['http'] = HTTPPusher(http_config)
             logger.info("HTTP 推送器初始化成功")
         
         # RabbitMQ 推送器
-        rabbitmq_config = config.get_rabbitmq_config()
+        rabbitmq_config = self.config.get_rabbitmq_config()
         if rabbitmq_config.get('enabled', False):
             self.pushers['rabbitmq'] = RabbitMQPusher(rabbitmq_config)
             logger.info("RabbitMQ 推送器初始化成功")
         
         # Kafka 推送器
-        kafka_config = config.get_kafka_config()
+        kafka_config = self.config.get_kafka_config()
         if kafka_config.get('enabled', False):
             self.pushers['kafka'] = KafkaPusher(kafka_config)
             logger.info("Kafka 推送器初始化成功")
@@ -436,4 +473,151 @@ class PushNotificationManager:
             except Exception as e:
                 logger.error(f"清理 {protocol} 推送器失败: {e}")
         
-        self.pushers.clear() 
+        self.pushers.clear()
+
+
+class PushNotificationService:
+    def __init__(self, config: Dict[str, Any]):
+        self.config = config.get('push_notification', {})
+
+    def send_notification(self, alert_data: Dict[str, Any]):
+        """
+        Sends a notification based on the configured method.
+        """
+        if not self.config.get('enabled'):
+            return
+
+        push_type = self.config.get('type', 'http')
+        logging.info(f"--- Triggering Push Notification ---")
+        logging.info(f"Push Type: {push_type}")
+        logging.info(f"Alert Data: {json.dumps(alert_data, indent=2, ensure_ascii=False)}")
+
+        if push_type == 'http':
+            self._send_http_notification(alert_data)
+        elif push_type == 'mqtt':
+            self._send_mqtt_notification(alert_data)
+        elif push_type == 'kafka':
+            self._send_kafka_notification(alert_data)
+        else:
+            logging.warning(f"Unsupported push notification type: {push_type}")
+
+    def _send_http_notification(self, alert_data: Dict[str, Any]):
+        url = self.config.get('url')
+        if not url:
+            logging.error("HTTP push notification is enabled, but no URL is configured.")
+            return
+
+        logging.info(f"Sending HTTP notification to: {url}")
+        try:
+            response = requests.post(
+                url, 
+                data=json.dumps(alert_data, ensure_ascii=False), 
+                headers={'Content-Type': 'application/json'},
+                timeout=10 # 10-second timeout
+            )
+            response.raise_for_status() # Raises an exception for 4XX/5XX responses
+            logging.info(f"HTTP notification sent successfully. Status Code: {response.status_code}")
+        except requests.exceptions.RequestException as e:
+            logging.error(f"Failed to send HTTP notification. Error: {e}")
+
+    def _send_mqtt_notification(self, alert_data: Dict[str, Any]):
+        if not MQTT_AVAILABLE:
+            logging.error("MQTT push is enabled, but 'paho-mqtt' library is not installed.")
+            return
+
+        broker = self.config.get('mqtt_broker')
+        port = self.config.get('mqtt_port', 1883)
+        topic = self.config.get('mqtt_topic')
+
+        if not all([broker, port, topic]):
+            logging.error("MQTT push is enabled, but broker, port, or topic is not fully configured.")
+            return
+            
+        logging.info(f"Sending MQTT notification to topic '{topic}' on broker '{broker}:{port}'")
+
+        client = None
+        try:
+            client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+            
+            username = self.config.get('username')
+            password = self.config.get('password')
+            if username:
+                client.username_pw_set(username, password)
+
+            client.connect(broker, port, 60)
+            client.loop_start()
+
+            payload = json.dumps(alert_data, ensure_ascii=False)
+            msg_info = client.publish(topic, payload, qos=1)
+            
+            # Wait for the message to be published
+            msg_info.wait_for_publish(timeout=5)
+
+            if msg_info.is_published():
+                logging.info(f"MQTT notification sent successfully to topic '{topic}'.")
+            else:
+                logging.error("Failed to publish MQTT message in time.")
+
+        except Exception as e:
+            logging.error(f"Failed to send MQTT notification. Error: {e}")
+        finally:
+            if client:
+                client.loop_stop()
+                client.disconnect()
+                logging.info("MQTT client disconnected.")
+
+    def _send_kafka_notification(self, alert_data: Dict[str, Any]):
+        if not KAFKA_PYTHON_AVAILABLE:
+            logging.error("Kafka push is enabled, but 'kafka-python' library is not installed.")
+            return
+
+        servers = self.config.get('kafka_bootstrap_servers')
+        topic = self.config.get('kafka_topic')
+
+        if not servers or not topic:
+            logging.error("Kafka push is enabled, but bootstrap servers or topic is not configured.")
+            return
+
+        logging.info(f"Sending Kafka notification to topic '{topic}' on servers '{servers}'")
+        
+        producer = None
+        try:
+            producer = KafkaProducer(
+                bootstrap_servers=servers.split(','),
+                value_serializer=lambda v: json.dumps(v, ensure_ascii=False).encode('utf-8'),
+                # Add a timeout for producer to avoid blocking indefinitely
+                request_timeout_ms=5000 
+            )
+            
+            # Send the message
+            future = producer.send(topic, value=alert_data)
+            
+            # Block for 'synchronous' sends
+            record_metadata = future.get(timeout=10)
+            
+            logging.info(
+                f"Kafka notification sent successfully. "
+                f"Topic: {record_metadata.topic}, Partition: {record_metadata.partition}, "
+                f"Offset: {record_metadata.offset}"
+            )
+
+        except Exception as e:
+            logging.error(f"Failed to send Kafka notification. Error: {e}")
+        finally:
+            if producer:
+                producer.flush()
+                producer.close()
+                logging.info("Kafka producer closed.")
+
+# Example usage (for testing purposes)
+def example():
+    config_data = {
+        "push_notification": {
+            "enabled": True,
+            "type": "http",
+            "url": "https://webhook.site/your-unique-url"
+        }
+    }
+    alert = {"id": 1, "title": "Test Alert", "description": "This is a test"}
+    notifier = PushNotificationService(config_data)
+    notifier.send_notification(alert) 

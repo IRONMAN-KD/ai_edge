@@ -102,19 +102,20 @@ CREATE TABLE IF NOT EXISTS tasks (
 -- 6. 告警记录表
 CREATE TABLE IF NOT EXISTS alerts (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    title VARCHAR(255) NOT NULL,
-    description TEXT,
-    level VARCHAR(50) NOT NULL DEFAULT 'medium',
-    status VARCHAR(50) NOT NULL DEFAULT 'pending',
-    confidence FLOAT NOT NULL,
-    task_id INT NOT NULL,
+    task_id INT,
     task_name VARCHAR(255),
     model_name VARCHAR(255),
     alert_image VARCHAR(255),
-    detection_class VARCHAR(100), -- For debouncing logic
+    confidence FLOAT,
+    detection_class VARCHAR(255),
+    title VARCHAR(255),
+    description TEXT,
+    status ENUM('pending', 'processing', 'resolved') DEFAULT 'pending',
+    level ENUM('low', 'medium', 'high') DEFAULT 'low',
+    remark TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+    FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='告警记录表';
 
 -- 7. 系统配置表
@@ -180,4 +181,12 @@ INSERT INTO users (username, password_hash, email, role) VALUES
 CREATE INDEX idx_models_status ON models(status);
 CREATE INDEX idx_tasks_status ON tasks(status);
 CREATE INDEX idx_alerts_task_status ON alerts(task_id, status);
-CREATE INDEX idx_alerts_create_time ON alerts(create_time DESC); 
+CREATE INDEX idx_alerts_create_time ON alerts(create_time DESC);
+
+CREATE TABLE system_configs (
+    `key` VARCHAR(255) PRIMARY KEY,
+    `value` JSON,
+    `description` TEXT,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+); 

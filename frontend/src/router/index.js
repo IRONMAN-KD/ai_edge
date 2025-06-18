@@ -24,13 +24,13 @@ const routes = [
         path: '/models',
         name: 'models',
         component: () => import('@/views/ModelManagement.vue'),
-        meta: { title: '模型管理' }
+        meta: { title: '模型管理', icon: 'cpu' }
       },
       {
         path: '/tasks',
         name: 'tasks',
         component: () => import('@/views/TaskManagement.vue'),
-        meta: { title: '任务配置' }
+        meta: { title: '任务管理', icon: 'list-check' }
       },
       {
         path: '/alerts',
@@ -43,6 +43,12 @@ const routes = [
         name: 'alertDetail',
         component: () => import('@/views/AlertDetail.vue'),
         meta: { title: '告警详情' }
+      },
+      {
+        path: '/settings',
+        name: 'SystemSettings',
+        component: () => import('@/views/SystemSettings.vue'),
+        meta: { title: '系统配置', icon: 'setting' }
       }
     ]
   }

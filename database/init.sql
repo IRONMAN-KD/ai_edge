@@ -43,4 +43,10 @@ CREATE TABLE IF NOT EXISTS inference_records (
 -- 创建默认管理员用户（密码：admin123）
 INSERT INTO users (username, password_hash, email) 
 VALUES ('admin', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewYpR1IOBYyGqK8y', 'admin@example.com')
-ON DUPLICATE KEY UPDATE username=username; 
+ON DUPLICATE KEY UPDATE username=username;
+
+-- Default system configurations
+INSERT INTO system_configs (`key`, `value`, `description`) VALUES
+('alert_retention', JSON_OBJECT('enabled', false, 'days', 30), '告警数据保留策略。enabled: 是否启用自动删除; days: 保留天数。'),
+('push_notification', JSON_OBJECT('enabled', false, 'type', 'http', 'url', '', 'mqtt_broker', '', 'mqtt_port', 1883, 'mqtt_topic', '', 'kafka_bootstrap_servers', '', 'kafka_topic', ''), '告警推送配置。支持 http, mqtt, kafka。')
+ON DUPLICATE KEY UPDATE `value`=VALUES(`value`), `description`=VALUES(`description`); 

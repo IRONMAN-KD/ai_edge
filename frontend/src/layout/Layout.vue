@@ -38,6 +38,11 @@
           <el-icon><Warning /></el-icon>
           <span>告警管理</span>
         </el-menu-item>
+
+        <el-menu-item index="/settings">
+          <el-icon><Setting /></el-icon>
+          <span>系统配置</span>
+        </el-menu-item>
       </el-menu>
     </div>
     
@@ -113,7 +118,8 @@ import {
   Fold,
   Expand,
   ArrowDown,
-  SwitchButton
+  SwitchButton,
+  Setting
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 
