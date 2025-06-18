@@ -30,6 +30,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 import requests
 import uuid
+import pytz
 
 # Add project root to Python path first
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -90,7 +91,7 @@ class DetectionStreamManager:
 detection_manager = DetectionStreamManager()
 
 # Mount static files directory for alert images
-app.mount("/alert_images", StaticFiles(directory="alert_images"), name="alert_images")
+app.mount("/alert_images", StaticFiles(directory=ALERT_IMAGE_DIR), name="alert_images")
 
 # Add a middleware to log incoming request headers
 @app.middleware("http")
@@ -454,12 +455,12 @@ def run_task_in_background(task_id: int, q: Queue):
         # Main loop to process video sources
         while True:
             # Re-fetch task to check status. In a real scenario, a better IPC mechanism would be used.
-            current_task_state = task_repo.get_task_by_id(task_id)
-            if not current_task_state or not current_task_state.is_enabled or current_task_state.status != 'running':
+            current_task = task_repo.get_task_by_id(task_id)
+            if not current_task or not current_task.is_enabled or current_task.status != 'running':
                 print(f"Task {task_id} is disabled or stopped. Exiting process.")
                 break
 
-            for source in current_task_state.video_sources:
+            for source in current_task.video_sources:
                 source_url = source.get("url")
                 if not source_url:
                     continue
@@ -476,7 +477,7 @@ def run_task_in_background(task_id: int, q: Queue):
                     ret, frame = cap.read()
                     if not ret:
                         print(f"ERROR: Task {task_id} could not read frame from {source_url}.")
-                        time.sleep(current_task_state.inference_interval)
+                        time.sleep(current_task.inference_interval)
                         continue
                 except Exception as e:
                     print(f"ERROR: Failed to read from video source {source_url} for task {task_id}. Error: {e}")
@@ -490,55 +491,101 @@ def run_task_in_background(task_id: int, q: Queue):
                 print(f"Task {task_id}: Frame captured from {source_url}. Running inference.")
                 try:
                     # The model's `inference` method is expected to be in `api/models/detection.py`
-                    detections = model.inference(frame)
-                    print(f"Task {task_id}: Inference complete. Found {len(detections)} potential objects.")
+                    all_detections = model.inference(frame)
+                    print(f"Task {task_id}: Inference complete. Found {len(all_detections)} potential objects.")
                 except Exception as e:
                     print(f"ERROR: Inference failed for task {task_id}. Error: {e}")
                     traceback.print_exc()
-                    time.sleep(current_task_state.inference_interval)
+                    time.sleep(current_task.inference_interval)
                     continue
 
+                # --- ROI Filtering Logic ---
+                roi = source.get("roi")
+                if roi and all_detections:
+                    detections_in_roi = []
+                    roi_x, roi_y, roi_w, roi_h = roi['x'], roi['y'], roi['w'], roi['h']
+                    for det in all_detections:
+                        box_x, box_y, box_w, box_h = det['box']
+                        center_x = box_x + box_w / 2
+                        center_y = box_y + box_h / 2
+                        if (roi_x <= center_x <= roi_x + roi_w) and \
+                           (roi_y <= center_y <= roi_y + roi_h):
+                            detections_in_roi.append(det)
+                    
+                    print(f"Task {task_id}: ROI filter applied. {len(all_detections)} detections -> {len(detections_in_roi)} detections.")
+                    detections = detections_in_roi
+                else:
+                    detections = all_detections
+                
                 if detections:
-                    # Send raw detections to websocket subscribers
+                    # Send raw (but ROI-filtered) detections to websocket subscribers
                     q.put({"task_id": task_id, "detections": detections})
                 
-                    # Process for alerts
-                    for detection in detections:
-                        confidence = detection.get('score', 0)
-                        class_name = detection.get('label', 'unknown')
+                    # Filter for high-confidence detections that can trigger alerts
+                    high_confidence_detections = [
+                        d for d in detections if d.get('score', 0) >= current_task.confidence_threshold
+                    ]
 
-                        if confidence >= current_task_state.confidence_threshold:
+                    if high_confidence_detections:
+                        # Create a single image for all high-confidence events in this frame
+                        # Use the class name of the highest confidence detection for the filename
+                        highest_conf_det = max(high_confidence_detections, key=lambda x: x['score'])
+                        class_name_for_file = highest_conf_det.get('label', 'multi_detection')
+                        
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        image_filename = f"alert_{task_id}_{class_name_for_file}_{timestamp}.jpg"
+                        abs_image_path = os.path.join(ALERT_IMAGE_DIR, image_filename)
+                        url_image_path = f"/alert_images/{image_filename}"
+                        
+                        # Start with a fresh copy of the frame to draw on
+                        frame_for_alert = frame.copy()
+
+                        # Draw the ROI on the image first, if it exists
+                        if roi:
+                            roi_x, roi_y, roi_w, roi_h = roi['x'], roi['y'], roi['w'], roi['h']
+                            cv2.rectangle(frame_for_alert, (roi_x, roi_y), (roi_x + roi_w, roi_y + roi_h), (255, 255, 0), 2) # Cyan color for ROI
+                            cv2.putText(frame_for_alert, 'ROI', (roi_x, roi_y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 0), 2)
+
+                        # Draw only the high-confidence detections on the (potentially ROI-drawn) image
+                        frame_with_dets = model.draw_result(frame_for_alert, high_confidence_detections)
+                        cv2.imwrite(abs_image_path, frame_with_dets)
+                        
+                        # Now, create an alert for each high-confidence detection, using the same image
+                        for detection in high_confidence_detections:
+                            confidence = detection.get('score', 0)
+                            class_name = detection.get('label', 'unknown')
+
+                            # Debounce check for this specific class
                             can_create_alert = True
                             latest_alert = alert_repo.get_latest_alert_for_task(task.id, class_name)
+                            
                             if latest_alert:
                                 time_since_last = datetime.now() - latest_alert.created_at
-                                if time_since_last < timedelta(seconds=current_task_state.alert_debounce_interval):
+                                if time_since_last < timedelta(seconds=current_task.alert_debounce_interval):
                                     can_create_alert = False
                             
                             if can_create_alert:
-                                print(f"Task {task_id}: High confidence detection '{class_name}' ({confidence:.2f}). Creating alert.")
-                                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                                image_filename = f"alert_{task_id}_{class_name}_{timestamp}.jpg"
-                                image_path = os.path.join(ALERT_IMAGE_DIR, image_filename)
-                                
-                                # Draw result on the frame for the alert image
-                                frame_with_dets = model.draw_result(frame.copy(), detections)
-                                cv2.imwrite(image_path, frame_with_dets)
-                                
+                                print(f"Task {task.id}: High confidence detection '{class_name}' ({confidence:.2f}). Creating alert.")
                                 alert_create = AlertCreate(
                                     task_id=task.id,
                                     task_name=task.name,
                                     model_name=model_details.name,
-                                    alert_image=image_path, # Use the absolute path for the alert
-                                    confidence=confidence,
+                                    alert_image=url_image_path, # Use the same relative URL path for all
+                                    confidence=confidence, # Store the raw float score (0.0 to 1.0)
                                     detection_class=class_name,
                                     title=f"Detection of {class_name}",
-                                    description=task.alert_message.format(task_name=task.name, time=datetime.now().strftime('%H:%M:%S'), class_name=class_name, confidence=confidence*100)
+                                    description=current_task.alert_message.format(
+                                        task_name=current_task.name, 
+                                        time=datetime.now().strftime('%H:%M:%S'), 
+                                        class_name=class_name, 
+                                        confidence=f"{(confidence * 100):.2f}", # Format confidence for string
+                                        video_name=source.get('name', 'Unknown Camera')
+                                    )
                                 )
                                 alert_repo.create_alert(alert_create)
 
                 # Wait for the specified interval before processing the next frame
-                time.sleep(current_task_state.inference_interval)
+                time.sleep(current_task.inference_interval)
 
     except Exception as e:
         print(f"FATAL ERROR in background process for task {task_id}: {e}")
@@ -595,14 +642,9 @@ def schedule_task(task: Task, task_repo: TaskRepository):
         stop_background_task(task.id)
         task_repo.update_task_status(task.id, 'stopped')
 
-    # Add jobs to start and stop the task
     if task.schedule_type == ScheduleType.CONTINUOUS:
-        # For continuous tasks, we assume they should be started if enabled.
-        # The actual start/stop is handled via API calls, not cron.
-        # However, if we want them to start on app startup, we can do this:
-        if task.status == 'running':
-             print(f"Restarting continuous task {task.id} on scheduler sync.")
-             start_background_task(task.id)
+        # Continuous tasks are not managed by cron jobs.
+        # They are started/stopped via API calls and restored on startup by `sync_and_schedule_all_tasks`.
         return
 
     # Logic for scheduled tasks (daily, weekly, monthly)
@@ -633,19 +675,66 @@ def sync_and_schedule_all_tasks():
     """Fetches all tasks from DB and syncs their schedule and running state."""
     print("--- Syncing and scheduling all tasks from database ---")
     task_repo = TaskRepository()
-    all_tasks = task_repo.get_all_tasks_for_scheduling()
+    try:
+        all_tasks = task_repo.get_all_tasks_for_scheduling()
+        print(f"Found {len(all_tasks)} tasks in the database to sync.")
+    except Exception as e:
+        print(f"FATAL: Could not fetch tasks from database on startup: {e}")
+        traceback.print_exc()
+        return
+
+    tz = pytz.timezone('Asia/Shanghai')
+    now = datetime.now(tz)
+    current_time = now.time()
+    current_iso_weekday = str(now.isoweekday())
+    current_month_day = str(now.day)
+
     for task in all_tasks:
-        # Schedule the task based on its settings
+        print(f"Syncing task ID: {task.id}, Name: {task.name}, Status: {task.status}, Enabled: {task.is_enabled}, Type: {task.schedule_type}")
+
+        # Always (re)schedule the task to ensure cron jobs are set up correctly.
         schedule_task(task, task_repo)
-        
-        # For tasks that should be running but aren't (e.g., after a server restart)
-        # We only handle CONTINUOUS tasks here. Scheduled tasks are handled by the scheduler.
-        if task.schedule_type == ScheduleType.CONTINUOUS and task.is_enabled and task.status == 'running':
-            print(f"Continuous task {task.id} was running. Restarting background process.")
+
+        # Case 1: Task was already running. Just restart it.
+        if task.status == 'running' and task.is_enabled:
+            print(f"Task {task.id} ('{task.name}') was running. Restarting background process.")
             start_background_task(task.id)
-        elif task.status == 'running': # If a scheduled task was running, stop it. Let the scheduler restart it.
-                print(f"Stopping previously running scheduled task {task.id}. Scheduler will handle restart.")
-                task_repo.update_task_status(task.id, 'stopped')
+            continue
+
+        # Case 2: Scheduled task that is currently stopped but *should* be running now.
+        if task.is_enabled and task.status == 'stopped' and task.schedule_type != ScheduleType.CONTINUOUS:
+            should_be_running = False
+            try:
+                start_time = datetime.strptime(task.start_time, '%H:%M:%S').time()
+                end_time = datetime.strptime(task.end_time, '%H:%M:%S').time()
+
+                # Check if current time is within the active time window.
+                time_is_right = False
+                if end_time > start_time: # Normal daytime schedule
+                    time_is_right = start_time <= current_time < end_time
+                else: # Overnight schedule (e.g., 22:00-06:00)
+                    time_is_right = current_time >= start_time or current_time < end_time
+
+                if time_is_right:
+                    # Check if the day is right.
+                    if task.schedule_type == ScheduleType.DAILY:
+                        should_be_running = True
+                    elif task.schedule_type == ScheduleType.WEEKLY:
+                        # If schedule_days is empty/None, it runs every day of the week.
+                        if not task.schedule_days or current_iso_weekday in task.schedule_days:
+                            should_be_running = True
+                    elif task.schedule_type == ScheduleType.MONTHLY:
+                        # If schedule_days is empty/None, it runs every day of the month.
+                        if not task.schedule_days or current_month_day in task.schedule_days:
+                            should_be_running = True
+            
+            except (ValueError, TypeError) as e:
+                print(f"[Warning] Could not parse schedule for task {task.id}. Skipping auto-start check. Error: {e}")
+
+            if should_be_running:
+                print(f"Task {task.id} ('{task.name}') is scheduled to be active now. Starting it.")
+                task_repo.update_task_status(task.id, 'running')
+                start_background_task(task.id)
 
 
 @app.on_event("startup")
@@ -760,45 +849,43 @@ async def delete_task(
         raise HTTPException(status_code=404, detail="Task not found")
 
 async def generate_mjpeg_stream(source: str):
-    """生成MJPEG视频流"""
-    while True:
-        cap = None
-        try:
-            cap = cv2.VideoCapture(source, cv2.CAP_FFMPEG)
-            if not cap.isOpened():
-                error_msg = "Could not open video source."
-                # 创建一个包含错误消息的图像
-                frame = np.zeros((480, 640, 3), dtype=np.uint8)
-                cv2.putText(frame, error_msg, (50, 240), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-                _, buffer = cv2.imencode('.jpg', frame)
-                yield (b'--frame\r\n'
-                       b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
-                await asyncio.sleep(5) # 等待5秒后重试
-                continue
-
-            while True:
-                ret, frame = cap.read()
-                if not ret:
-                    # 如果读取失败，跳出内层循环以尝试重新打开视频源
-                    break
-                
-                _, buffer = cv2.imencode('.jpg', frame)
-                yield (b'--frame\r\n'
-                       b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
-                await asyncio.sleep(1/30) # 控制帧率
-
-        except Exception as e:
-            logging.error(f"Error in MJPEG stream for {source}: {e}")
-            # 创建一个包含错误消息的图像
+    """
+    Generates an MJPEG stream from a video source.
+    This is a single-shot generator that handles client disconnections gracefully.
+    """
+    cap = None
+    try:
+        logging.info(f"Opening MJPEG stream for: {source}")
+        cap = cv2.VideoCapture(source, cv2.CAP_FFMPEG)
+        if not cap.isOpened():
+            error_msg = "Could not open video source."
+            logging.error(f"{error_msg} ({source})")
             frame = np.zeros((480, 640, 3), dtype=np.uint8)
-            cv2.putText(frame, f"Error: {e}", (50, 240), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+            cv2.putText(frame, error_msg, (50, 240), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
             _, buffer = cv2.imencode('.jpg', frame)
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
-            await asyncio.sleep(5) # 发生异常后，等待5秒再重试
-        finally:
-            if cap:
-                cap.release()
+            return
+
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                logging.warning(f"Lost connection to video stream: {source}. Stopping stream.")
+                break
+
+            _, buffer = cv2.imencode('.jpg', frame)
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+            await asyncio.sleep(1/30) # Control frame rate
+
+    except asyncio.CancelledError:
+        logging.info(f"Client disconnected from stream: {source}. Closing resources.")
+    except Exception as e:
+        logging.error(f"An unexpected error occurred in MJPEG stream for {source}: {e}")
+    finally:
+        if cap and cap.isOpened():
+            cap.release()
+            logging.info(f"Video capture for {source} released.")
 
 
 @app.get("/tasks/{task_id}/stream")
@@ -961,6 +1048,40 @@ async def batch_update_alerts(
             alert_id, update_request.status.value, update_request.remark
         )
     return None
+
+# Dashboard Route
+@app.get("/dashboard/stats")
+async def get_dashboard_stats(
+    current_user: User = Depends(get_current_user),
+    task_repo: TaskRepository = Depends(get_task_repository),
+    alert_repo: AlertRepository = Depends(get_alert_repository),
+    model_repo: ModelRepository = Depends(get_model_repository)
+):
+    """
+    Provides aggregated statistics for the dashboard.
+    """
+    total_tasks = task_repo.get_total_count()
+    task_counts_by_status = task_repo.get_task_counts_by_status()
+    total_models = model_repo.get_total_count()
+    alert_counts_by_status = alert_repo.get_alert_counts_by_status()
+    alert_counts_by_day = alert_repo.get_alert_counts_by_day(days=7)
+    latest_alerts = alert_repo.get_latest_alerts(limit=5)
+    
+    return {
+        "summary": {
+            "total_tasks": total_tasks,
+            "running_tasks": task_counts_by_status.get("running", 0),
+            "total_models": total_models,
+            "pending_alerts": alert_counts_by_status.get("pending", 0),
+        },
+        "alerts_by_status": {
+            "pending": alert_counts_by_status.get("pending", 0),
+            "processing": alert_counts_by_status.get("processing", 0),
+            "resolved": alert_counts_by_status.get("resolved", 0),
+        },
+        "alerts_past_week": alert_counts_by_day,
+        "latest_alerts": latest_alerts,
+    }
 
 if __name__ == '__main__':
     import uvicorn

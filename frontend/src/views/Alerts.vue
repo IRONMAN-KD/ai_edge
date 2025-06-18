@@ -7,83 +7,90 @@
         <p>查看和处理系统告警信息</p>
       </div>
       <div class="header-right">
-        <el-button type="primary" @click="handleBatchProcess">
+        <el-button type="primary" @click="handleBatchProcess" icon="el-icon-finished">
           批量处理
         </el-button>
-        <el-button @click="handleRefresh">
-          <el-icon><Refresh /></el-icon>
+        <el-button @click="handleRefresh" icon="el-icon-refresh">
           刷新
         </el-button>
       </div>
     </div>
     
     <!-- 搜索和筛选 -->
-    <div class="search-bar">
-      <el-input
-        v-model="searchForm.keyword"
-        placeholder="搜索告警内容"
-        style="width: 300px"
-        clearable
-        @input="handleSearch"
-      >
-        <template #prefix>
-          <el-icon><Search /></el-icon>
-        </template>
-      </el-input>
-      
-      <el-select v-model="searchForm.level" placeholder="告警级别" clearable @change="handleSearch">
-        <el-option label="高" value="high" />
-        <el-option label="中" value="medium" />
-        <el-option label="低" value="low" />
-      </el-select>
-      
-      <el-select v-model="searchForm.status" placeholder="处理状态" clearable @change="handleSearch">
-        <el-option label="待处理" value="pending" />
-        <el-option label="处理中" value="processing" />
-        <el-option label="已解决" value="resolved" />
-      </el-select>
-      
-      <el-date-picker
-        v-model="searchForm.date_range"
-        type="daterange"
-        range-separator="至"
-        start-placeholder="开始日期"
-        end-placeholder="结束日期"
-        format="YYYY-MM-DD"
-        value-format="YYYY-MM-DD"
-        @change="handleSearch"
-      />
-    </div>
-    
+    <el-card class="box-card search-card" shadow="never">
+      <div class="search-bar">
+        <el-input
+          v-model="searchForm.keyword"
+          placeholder="搜索告警内容、任务名称"
+          clearable
+          @input="handleSearch"
+        >
+          <template #prefix>
+            <el-icon><Search /></el-icon>
+          </template>
+        </el-input>
+        
+        <el-select v-model="searchForm.level" placeholder="告警级别" clearable @change="handleSearch">
+          <el-option label="高" value="high" />
+          <el-option label="中" value="medium" />
+          <el-option label="低" value="low" />
+        </el-select>
+        
+        <el-select v-model="searchForm.status" placeholder="处理状态" clearable @change="handleSearch">
+          <el-option label="待处理" value="pending" />
+          <el-option label="处理中" value="processing" />
+          <el-option label="已解决" value="resolved" />
+        </el-select>
+        
+        <el-date-picker
+          v-model="searchForm.date_range"
+          type="daterange"
+          range-separator="至"
+          start-placeholder="开始日期"
+          end-placeholder="结束日期"
+          format="YYYY-MM-DD"
+          value-format="YYYY-MM-DD"
+          @change="handleSearch"
+        />
+      </div>
+    </el-card>
+
     <!-- 告警列表 -->
-    <div class="alerts-table">
+    <el-card class="box-card" shadow="never">
       <el-table
         :data="alerts"
         style="width: 100%"
         v-loading="loading"
         @selection-change="handleSelectionChange"
+        row-class-name="alert-table-row"
       >
         <el-table-column type="selection" width="55" />
         
-        <el-table-column prop="title" label="告警内容" min-width="200">
+        <el-table-column label="告警快照" width="100">
           <template #default="{ row }">
-            <div class="alert-content">
-              <div class="alert-icon" :class="row.level">
-                <el-icon size="16">
-                  <component :is="getAlertIcon(row.level)" />
-                </el-icon>
-              </div>
-              <div class="alert-info">
-                <div class="alert-title">{{ row.title }}</div>
-                <div class="alert-desc">{{ row.description }}</div>
-              </div>
+            <el-image 
+              style="width: 70px; height: 50px; border-radius: 4px;"
+              :src="`/${(row.alert_image || '').replace(/^\/+/, '')}`" 
+              :preview-src-list="[`/${(row.alert_image || '').replace(/^\/+/, '')}`]"
+              fit="cover"
+              :initial-index="0"
+              hide-on-click-modal
+              preview-teleported
+            />
+          </template>
+        </el-table-column>
+        
+        <el-table-column prop="title" label="告警内容" min-width="250">
+          <template #default="{ row }">
+            <div class="alert-info">
+              <div class="alert-desc">{{ row.description }}</div>
             </div>
           </template>
         </el-table-column>
         
-        <el-table-column prop="task_name" label="关联任务" width="120" />
+        <el-table-column prop="task_name" label="关联任务" width="150" />
         
-        <el-table-column prop="level" label="级别" width="80">
+        <el-table-column prop="level" label="级别" width="100">
           <template #default="{ row }">
             <el-tag :type="getLevelType(row.level)" size="small">
               {{ getLevelText(row.level) }}
@@ -99,16 +106,16 @@
           </template>
         </el-table-column>
         
-        <el-table-column prop="confidence" label="置信度" width="100">
+        <el-table-column prop="confidence" label="置信度" width="120">
           <template #default="{ row }">
             <div class="confidence-bar">
               <el-progress
-                :percentage="row.confidence"
-                :color="getConfidenceColor(row.confidence)"
+                :percentage="parseFloat((row.confidence * 100).toFixed(2))"
+                :color="getConfidenceColor(row.confidence * 100)"
                 :stroke-width="6"
                 :show-text="false"
               />
-              <span class="confidence-text">{{ row.confidence }}%</span>
+              <span class="confidence-text">{{ (row.confidence * 100).toFixed(2) }}%</span>
             </div>
           </template>
         </el-table-column>
@@ -119,10 +126,11 @@
           </template>
         </el-table-column>
         
-        <el-table-column label="操作" width="150" fixed="right">
+        <el-table-column label="操作" width="200" fixed="right">
           <template #default="{ row }">
             <el-button
               type="primary"
+              text
               size="small"
               @click="viewAlertDetail(row)"
             >
@@ -131,6 +139,7 @@
             <el-button
               v-if="row.status === 'pending'"
               type="success"
+              text
               size="small"
               @click="processAlert(row)"
             >
@@ -138,6 +147,7 @@
             </el-button>
             <el-button
               type="danger"
+              text
               size="small"
               @click="deleteAlert(row)"
             >
@@ -146,21 +156,21 @@
           </template>
         </el-table-column>
       </el-table>
-    </div>
-    
-    <!-- 分页 -->
-    <div class="pagination-wrapper">
-      <el-pagination
-        v-model:current-page="pagination.page"
-        v-model:page-size="pagination.page_size"
-        :total="pagination.total"
-        :page-sizes="[10, 20, 50, 100]"
-        layout="total, sizes, prev, pager, next, jumper"
-        @size-change="handleSizeChange"
-        @current-change="handleCurrentChange"
-      />
-    </div>
-    
+
+      <!-- 分页 -->
+      <div class="pagination-wrapper">
+        <el-pagination
+          v-model:current-page="pagination.page"
+          v-model:page-size="pagination.page_size"
+          :total="pagination.total"
+          :page-sizes="[10, 20, 50, 100]"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+        />
+      </div>
+    </el-card>
+
     <!-- 批量处理对话框 -->
     <el-dialog
       v-model="showBatchDialog"
@@ -201,7 +211,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Refresh, Search, Warning, InfoFilled, SuccessFilled } from '@element-plus/icons-vue'
+import { Refresh, Search, Warning, InfoFilled, SuccessFilled, ArrowDown } from '@element-plus/icons-vue'
 import { getAlerts, updateAlert, deleteAlert as deleteAlertApi, batchUpdateAlerts } from '@/api/alerts'
 import dayjs from 'dayjs'
 
@@ -438,92 +448,88 @@ onMounted(() => {
 })
 </script>
 
+<style lang="scss">
+.el-table .alert-table-row {
+  height: 75px;
+}
+</style>
+
 <style scoped lang="scss">
 .alerts-container {
-  padding: 20px;
+  padding: 24px;
+  background-color: #f7f8fa;
 }
 
 .page-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 30px;
+  align-items: center;
+  margin-bottom: 24px;
   
   .header-left {
     h2 {
-      margin: 0 0 8px;
-      font-size: 24px;
-      font-weight: 600;
-      color: var(--text-color);
+      margin: 0 0 4px;
+      font-size: 22px;
     }
-    
     p {
       margin: 0;
-      color: var(--text-color-secondary);
       font-size: 14px;
+      color: #909399;
     }
   }
-  
-  .header-right {
-    display: flex;
-    gap: 12px;
+}
+
+.box-card {
+  border: none;
+}
+
+.search-card {
+  margin-bottom: 20px;
+  :deep(.el-card__body) {
+    padding: 20px;
   }
 }
 
 .search-bar {
   display: flex;
   gap: 16px;
-  margin-bottom: 24px;
-  align-items: center;
   flex-wrap: wrap;
+  align-items: center;
+  .el-input, .el-select {
+    width: 240px;
+  }
 }
 
 .alerts-table {
-  margin-bottom: 30px;
-  
   .alert-content {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 12px;
     
     .alert-icon {
-      width: 32px;
-      height: 32px;
-      border-radius: 6px;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
       
-      &.high {
-        background: rgba(245, 108, 108, 0.1);
-        color: var(--danger-color);
-      }
-      
-      &.medium {
-        background: rgba(230, 162, 60, 0.1);
-        color: var(--warning-color);
-      }
-      
-      &.low {
-        background: rgba(103, 194, 58, 0.1);
-        color: var(--success-color);
-      }
+      &.high { background: #fef0f0; color: #f56c6c; }
+      &.medium { background: #fdf6ec; color: #e6a23c; }
+      &.low { background: #f0f9eb; color: #67c23a; }
     }
     
     .alert-info {
-      flex: 1;
-      
       .alert-title {
-        font-weight: 600;
-        color: var(--text-color);
+        font-weight: 500;
+        color: #303133;
         margin-bottom: 4px;
       }
-      
       .alert-desc {
-        font-size: 12px;
-        color: var(--text-color-secondary);
-        line-height: 1.4;
+        font-size: 13px;
+        color: #606266;
+        line-height: 1.5;
       }
     }
   }
@@ -534,45 +540,21 @@ onMounted(() => {
     gap: 8px;
     
     .confidence-text {
-      font-size: 12px;
-      color: var(--text-color-secondary);
-      min-width: 30px;
+      font-size: 13px;
+      color: #606266;
+      min-width: 45px;
+      font-weight: 500;
     }
   }
 }
 
 .pagination-wrapper {
   display: flex;
-  justify-content: center;
-  margin-top: 30px;
+  justify-content: flex-end;
+  margin-top: 24px;
 }
 
-// 响应式
-@media (max-width: 768px) {
-  .alerts-container {
-    padding: 10px;
-  }
-  
-  .page-header {
-    flex-direction: column;
-    gap: 16px;
-    align-items: stretch;
-  }
-  
-  .search-bar {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  
-  .alerts-table {
-    .alert-content {
-      flex-direction: column;
-      gap: 8px;
-      
-      .alert-icon {
-        align-self: flex-start;
-      }
-    }
-  }
+.danger-option {
+  color: #f56c6c;
 }
 </style> 

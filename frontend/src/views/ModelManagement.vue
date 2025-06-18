@@ -58,7 +58,6 @@
         </template>
 
         <div class="card-body">
-          <p class="model-description">{{ model.description || '暂无描述信息' }}</p>
           <div class="model-info">
             <div class="info-item">
               <el-icon><CollectionTag /></el-icon>
@@ -66,7 +65,7 @@
             </div>
             <div class="info-item">
               <el-icon><MessageBox /></el-icon>
-              <span>类型: {{ getTypeText(model.type) }}</span>
+              <span>类型: {{ getModelTypeLabel(model.type) }}</span>
             </div>
             <div class="info-item">
               <el-icon><Clock /></el-icon>
@@ -97,7 +96,7 @@
         </div>
       </el-card>
     </div>
-
+    
     <div class="pagination-container">
       <el-pagination
         v-if="total > 0"
@@ -110,7 +109,7 @@
         @current-change="fetchModels"
       />
     </div>
-    
+
     <!-- Upload Dialog -->
     <el-dialog v-model="showUploadDialog" title="上传新模型" width="600px" :close-on-click-modal="false" @close="resetUploadForm">
       <el-form ref="uploadFormRef" :model="uploadForm" :rules="uploadRules" label-width="100px">
@@ -178,7 +177,7 @@
           </el-descriptions-item>
           <el-descriptions-item label="模型名称">{{ selectedModel.name }}</el-descriptions-item>
           <el-descriptions-item label="版本">{{ selectedModel.version }}</el-descriptions-item>
-          <el-descriptions-item label="类型">{{ getTypeText(selectedModel.type) }}</el-descriptions-item>
+          <el-descriptions-item label="类型">{{ getModelTypeLabel(selectedModel.type) }}</el-descriptions-item>
           <el-descriptions-item label="文件路径">{{ selectedModel.file_path }}</el-descriptions-item>
           <el-descriptions-item label="上传时间">{{ formatDate(selectedModel.upload_time) }}</el-descriptions-item>
           <el-descriptions-item label="更新时间">{{ formatDate(selectedModel.update_time) }}</el-descriptions-item>
@@ -231,13 +230,14 @@
         </span>
       </template>
     </el-dialog>
+
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue';
 import { ElMessage, ElMessageBox, ElCard } from 'element-plus';
-import { Plus, Search, UploadFilled, PriceTag, CollectionTag, Clock, View, Delete, MessageBox, Check, Close, Edit } from '@element-plus/icons-vue';
+import { Plus, Search, UploadFilled, Cpu, CollectionTag, Clock, View, Delete, MessageBox, Check, Close, Edit } from '@element-plus/icons-vue';
 import { getModels, uploadModel, deleteModel as apiDeleteModel, updateModelStatus, updateModel } from '@/api/models';
 import { formatDate } from '@/utils/formatters';
 import { MODEL_TYPES, getModelTypeLabel } from '@/utils/model_types';
@@ -271,6 +271,7 @@ const uploadRules = {
   name: [{ required: true, message: '请输入模型名称', trigger: 'blur' }],
   version: [{ required: true, message: '请输入模型版本', trigger: 'blur' }],
   type: [{ required: true, message: '请选择模型类型', trigger: 'change' }],
+  labels: [{ required: true, message: '请输入模型标签', trigger: 'blur' }],
   file: [{ required: true, message: '请选择模型文件', trigger: 'change' }],
 };
 
@@ -374,9 +375,10 @@ const deleteModel = (model) => {
     try {
       await apiDeleteModel(model.id);
       ElMessage.success('删除成功');
-      fetchModels();
+      await fetchModels(); // Refresh list after deletion
     } catch (error) {
       ElMessage.error('删除失败');
+      console.error('Failed to delete model:', error);
     }
   }).catch(() => {});
 };
@@ -444,7 +446,6 @@ onMounted(fetchModels);
 
 const getStatusType = (status) => ({ active: 'success', inactive: 'warning', deleted: 'danger' }[status] || 'primary');
 const getStatusText = (status) => ({ active: '启用', inactive: '禁用', deleted: '禁用' }[status] || '未知');
-const getTypeText = (type) => getModelTypeLabel(type);
 </script>
 
 <style scoped>
@@ -511,24 +512,13 @@ const getTypeText = (type) => getModelTypeLabel(type);
   color: #409eff;
 }
 
-.card-body .model-description {
-  color: #606266;
-  font-size: 14px;
-  margin-bottom: 16px;
-  height: 40px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-
 .card-body .model-info {
   display: flex;
   flex-direction: column;
   gap: 12px;
   color: #909399;
   font-size: 14px;
+  padding-top: 16px;
 }
 
 .model-info .info-item {

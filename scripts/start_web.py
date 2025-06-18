@@ -31,7 +31,7 @@ def start_web_app():
         static_dir = project_root / 'web' / 'static'
         static_dir.mkdir(parents=True, exist_ok=True)
         
-        print("正在启动华为 AI Edge 智能小站管理系统...")
+        print("正在启动兆慧 AI Edge 智能小站管理系统...")
         print(f"项目根目录: {project_root}")
         print(f"上传目录: {upload_dir}")
         print(f"静态文件目录: {static_dir}")

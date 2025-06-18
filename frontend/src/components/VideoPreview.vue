@@ -1,238 +1,190 @@
 <template>
   <div class="video-preview-container" ref="containerRef">
     <img 
-      v-if="streamUrl" 
+      v-if="streamUrl"
       :src="streamUrl" 
-      class="video-feed" 
-      ref="videoFeed"
-      alt="Video Stream" 
-      @load="handleStreamLoad"
+      alt="Video Stream"
+      class="video-stream"
+      @load="onImageLoad"
+      ref="imageRef"
     />
-    <canvas v-if="streamUrl" ref="overlayCanvas" class="overlay-canvas"></canvas>
-    <div v-if="!streamUrl || connectionStatus === 'failed'" class="status-overlay">
-      <el-icon><CircleCloseFilled /></el-icon>
-      <span>{{ errorMessage || '无效的任务或视频源' }}</span>
-    </div>
-     <div v-else-if="connectionStatus === 'connecting'" class="status-overlay">
-      <el-icon class="is-loading"><Loading /></el-icon>
-      <span>正在连接数据流...</span>
+    <canvas ref="canvasRef" class="overlay-canvas"></canvas>
+    <div v-if="!streamUrl" class="no-stream">
+      <el-icon><VideoCamera /></el-icon>
+      <span>无视频流</span>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
-import { ElMessage } from 'element-plus';
-import { Loading, CircleCloseFilled } from '@element-plus/icons-vue';
+import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue';
+import { useUserStore } from '@/stores/user';
+import { VideoCamera } from '@element-plus/icons-vue';
 
 const props = defineProps({
-  task: {
-    type: Object,
+  taskId: {
+    type: Number,
     required: true,
+  },
+  streamUrl: {
+    type: String,
+    default: '',
   },
 });
 
+const userStore = useUserStore();
+const ws = ref(null);
 const containerRef = ref(null);
-const videoFeed = ref(null);
-const overlayCanvas = ref(null);
-const latestDetections = ref([]);
-const connectionStatus = ref('connecting'); // connecting, connected, failed, closed
-const errorMessage = ref('');
-let ws = null;
+const imageRef = ref(null);
+const canvasRef = ref(null);
+const naturalSize = ref({ width: 0, height: 0 });
 
-const streamUrl = computed(() => {
-  if (props.task && props.task.id) {
-    return `/api/tasks/${props.task.id}/stream`;
-  }
-  return null;
-});
-
-const setupWebSocket = () => {
-  if (!props.task || !props.task.id) return;
-
-  const token = localStorage.getItem('token');
-  if (!token) {
-    connectionStatus.value = 'failed';
-    errorMessage.value = '未找到认证令牌，请重新登录。';
-    return;
-  }
+const connectWebSocket = () => {
+  if (!props.taskId || !userStore.token) return;
 
   const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const wsUrl = `${wsProtocol}//${window.location.host}/ws/tasks/${props.task.id}/stream?token=${token}`;
-  
-  ws = new WebSocket(wsUrl);
-  connectionStatus.value = 'connecting';
+  // Assuming the backend is on the same host, but different port during dev
+  const wsHost = import.meta.env.DEV ? 'localhost:5001' : window.location.host;
+  const wsUrl = `${wsProtocol}//${wsHost}/ws/tasks/${props.taskId}/stream?token=${userStore.token}`;
 
-  ws.onopen = () => {
-    connectionStatus.value = 'connected';
+  ws.value = new WebSocket(wsUrl);
+
+  ws.value.onopen = () => {
+    console.log(`WebSocket connected for task ${props.taskId}`);
   };
 
-  ws.onmessage = (event) => {
+  ws.value.onmessage = (event) => {
     const data = JSON.parse(event.data);
     if (data.detections) {
-      latestDetections.value = data.detections;
+      drawDetections(data.detections);
     }
   };
 
-  ws.onerror = (error) => {
+  ws.value.onclose = () => {
+    console.log('WebSocket disconnected.');
+  };
+
+  ws.value.onerror = (error) => {
     console.error('WebSocket error:', error);
-    connectionStatus.value = 'failed';
-    errorMessage.value = '数据流连接失败。';
-  };
-
-  ws.onclose = (event) => {
-    if (event.code !== 1000) {
-      connectionStatus.value = 'failed';
-      errorMessage.value = `数据流已断开: ${event.reason || '未知错误'}`;
-    } else {
-      connectionStatus.value = 'closed';
-    }
   };
 };
 
-const drawOverlay = () => {
-  const img = videoFeed.value;
-  const canvas = overlayCanvas.value;
-  const ctx = canvas?.getContext('2d');
-  const detections = latestDetections.value;
+const drawDetections = (detections) => {
+  const canvas = canvasRef.value;
+  const image = imageRef.value;
+  if (!canvas || !image) return;
 
-  if (!img || !canvas || !ctx || img.naturalWidth === 0) return;
-
-  // Match canvas size to the displayed image size
-  const { width, height, top, left } = getRenderedSize(img);
-  canvas.width = width;
-  canvas.height = height;
-  canvas.style.top = `${top}px`;
-  canvas.style.left = `${left}px`;
+  const ctx = canvas.getContext('2d');
+  const { clientWidth: displayWidth, clientHeight: displayHeight } = image;
+  const { width: naturalWidth, height: naturalHeight } = naturalSize.value;
   
-  const scaleX = canvas.width / img.naturalWidth;
-  const scaleY = canvas.height / img.naturalHeight;
+  if (naturalWidth === 0 || naturalHeight === 0) return;
+
+  // Sync canvas size with display size
+  canvas.width = displayWidth;
+  canvas.height = displayHeight;
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  
-  if (!detections) return;
+
+  const scaleX = displayWidth / naturalWidth;
+  const scaleY = displayHeight / naturalHeight;
 
   detections.forEach(det => {
-    const { box, label, score } = det;
-    const [x, y, w, h] = box;
+    const [x, y, w, h] = det.box;
+    const score = det.score;
+    const label = det.label;
 
-    const scaledX = x * scaleX;
-    const scaledY = y * scaleY;
-    const scaledW = w * scaleX;
-    const scaledH = h * scaleY;
-
-    ctx.strokeStyle = '#409EFF';
+    ctx.strokeStyle = '#409eff';
     ctx.lineWidth = 2;
-    ctx.strokeRect(scaledX, scaledY, scaledW, scaledH);
-    
-    const text = `${label} ${score.toFixed(2)}`;
-    ctx.font = 'bold 14px Arial';
-    const textMetrics = ctx.measureText(text);
-    
-    ctx.fillStyle = '#409EFF';
-    ctx.fillRect(scaledX, scaledY - 20, textMetrics.width + 8, 20);
+    ctx.strokeRect(x * scaleX, y * scaleY, w * scaleX, h * scaleY);
 
+    ctx.fillStyle = '#409eff';
+    const text = `${label}: ${score.toFixed(2)}`;
+    ctx.font = '14px Arial';
+    const textMetrics = ctx.measureText(text);
+    ctx.fillRect(
+      x * scaleX,
+      y * scaleY - 18,
+      textMetrics.width + 8,
+      18
+    );
     ctx.fillStyle = 'white';
-    ctx.fillText(text, scaledX + 4, scaledY - 5);
+    ctx.fillText(text, x * scaleX + 4, y * scaleY - 5);
   });
 };
 
-const getRenderedSize = (img) => {
-  if (!img || !img.parentElement) return { width: 0, height: 0, top: 0, left: 0 };
-  
-  const container = img.parentElement;
-  const containerAspect = container.clientWidth / container.clientHeight;
-  const imgAspect = img.naturalWidth / img.naturalHeight;
-  
-  let renderedWidth, renderedHeight, top, left;
-
-  if (imgAspect > containerAspect) {
-    renderedWidth = container.clientWidth;
-    renderedHeight = renderedWidth / imgAspect;
-    top = (container.clientHeight - renderedHeight) / 2;
-    left = 0;
-  } else {
-    renderedHeight = container.clientHeight;
-    renderedWidth = renderedHeight * imgAspect;
-    left = (container.clientWidth - renderedWidth) / 2;
-    top = 0;
+const onImageLoad = () => {
+  const image = imageRef.value;
+  if (image) {
+    naturalSize.value = { width: image.naturalWidth, height: image.naturalHeight };
   }
-  return { width: renderedWidth, height: renderedHeight, top, left };
 };
-
-const handleStreamLoad = () => {
-  // When the MJPEG stream image loads for the first time, resize the canvas.
-  drawOverlay();
-};
-
-watch(latestDetections, () => {
-  drawOverlay();
-});
 
 let resizeObserver;
 onMounted(() => {
-  setupWebSocket();
-  const container = containerRef.value;
-  if (container) {
+  connectWebSocket();
+  
+  if (containerRef.value) {
     resizeObserver = new ResizeObserver(() => {
-      drawOverlay();
+      // Redraw with latest detections when size changes
+      // This is a simplification; ideally, you'd store the last detections
+      // and redraw them. For now, we wait for the next message.
+      const canvas = canvasRef.value;
+      const image = imageRef.value;
+      if (canvas && image) {
+        canvas.width = image.clientWidth;
+        canvas.height = image.clientHeight;
+      }
     });
-    resizeObserver.observe(container);
+    resizeObserver.observe(containerRef.value);
   }
 });
 
 onUnmounted(() => {
-  if (ws) {
-    ws.close(1000, "Component unmounted");
+  if (ws.value) {
+    ws.value.close();
   }
   if (resizeObserver) {
     resizeObserver.disconnect();
   }
 });
 
+watch(() => props.taskId, (newId, oldId) => {
+  if (newId !== oldId) {
+    if (ws.value) {
+      ws.value.close();
+    }
+    connectWebSocket();
+  }
+});
 </script>
 
 <style scoped>
 .video-preview-container {
   position: relative;
   width: 100%;
+  height: 100%;
   background-color: #000;
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 50vh;
-  overflow: hidden;
 }
-
-.video-feed {
+.video-stream {
   max-width: 100%;
-  max-height: 80vh;
+  max-height: 100%;
   object-fit: contain;
 }
-
 .overlay-canvas {
-  position: absolute;
-  pointer-events: none;
-}
-
-.status-overlay {
   position: absolute;
   top: 0;
   left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.7);
-  color: white;
+  pointer-events: none; /* Make canvas transparent to mouse events */
+}
+.no-stream {
+  color: #fff;
   display: flex;
   flex-direction: column;
-  justify-content: center;
   align-items: center;
-  font-size: 1.2rem;
-  z-index: 10;
-}
-
-.status-overlay .el-icon {
-  font-size: 3rem;
-  margin-bottom: 1rem;
+  gap: 8px;
 }
 </style> 

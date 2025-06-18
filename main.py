@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-华为 AI Edge 智能小站 - 视觉识别算法系统
+兆慧 AI Edge 智能小站 - 视觉识别算法系统
 主程序入口
 """
 

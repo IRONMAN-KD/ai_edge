@@ -1,546 +1,195 @@
 <template>
-  <div class="dashboard-container">
-    <!-- 统计卡片 -->
-    <div class="stats-grid">
-      <div class="stat-card dashboard-card" v-for="stat in stats" :key="stat.title">
-        <div class="stat-icon" :style="{ background: stat.color }">
-          <el-icon size="24" color="#fff">
-            <component :is="stat.icon" />
-          </el-icon>
-        </div>
-        <div class="stat-content">
-          <div class="stat-value">{{ stat.value }}</div>
-          <div class="stat-title">{{ stat.title }}</div>
-          <div class="stat-change" :class="stat.trend">
-            <el-icon size="12">
-              <component :is="stat.trend === 'up' ? 'ArrowUp' : 'ArrowDown'" />
-            </el-icon>
-            {{ stat.change }}%
-          </div>
-        </div>
-      </div>
-    </div>
-    
-    <!-- 图表区域 -->
-    <div class="charts-grid">
-      <div class="chart-card dashboard-card">
-        <div class="chart-header">
-          <h3>告警趋势</h3>
-          <el-select v-model="alertTimeRange" size="small">
-            <el-option label="最近7天" value="7" />
-            <el-option label="最近30天" value="30" />
-            <el-option label="最近90天" value="90" />
-          </el-select>
-        </div>
-        <div class="chart-content">
-          <v-chart :option="alertChartOption" autoresize />
-        </div>
-      </div>
-      
-      <div class="chart-card dashboard-card">
-        <div class="chart-header">
-          <h3>任务状态分布</h3>
-        </div>
-        <div class="chart-content">
-          <v-chart :option="taskChartOption" autoresize />
-        </div>
-      </div>
-    </div>
-    
-    <!-- 最近告警 -->
-    <div class="recent-alerts dashboard-card">
-      <div class="card-header">
-        <h3>最近告警</h3>
-        <el-button type="primary" text @click="$router.push('/alerts')">
-          查看全部
-          <el-icon><ArrowRight /></el-icon>
-        </el-button>
-      </div>
-      
-      <div class="alerts-list">
-        <div
-          v-for="alert in recentAlerts"
-          :key="alert.id"
-          class="alert-item"
-          @click="viewAlertDetail(alert.id)"
-        >
-          <div class="alert-icon" :class="alert.level">
-            <el-icon size="16">
-              <component :is="getAlertIcon(alert.level)" />
-            </el-icon>
-          </div>
-          <div class="alert-content">
-            <div class="alert-title">{{ alert.title }}</div>
-            <div class="alert-info">
-              <span>{{ alert.task_name }}</span>
-              <span>{{ formatTime(alert.created_at) }}</span>
+  <div class="dashboard-container" v-loading="loading">
+    <!-- 概览统计 -->
+    <el-row :gutter="20" class="summary-row">
+      <el-col :span="6" v-for="item in summaryItems" :key="item.title">
+        <el-card shadow="hover" class="summary-card">
+          <div class="card-content">
+            <div class="icon-wrapper" :style="{ backgroundColor: item.color }">
+              <el-icon><component :is="item.icon" /></el-icon>
+            </div>
+            <div class="text-wrapper">
+              <div class="title">{{ item.title }}</div>
+              <div class="value">{{ item.value }}</div>
             </div>
           </div>
-          <div class="alert-status" :class="alert.status">
-            {{ getStatusText(alert.status) }}
-          </div>
-        </div>
-      </div>
-    </div>
+        </el-card>
+      </el-col>
+    </el-row>
+
+    <!-- 图表和列表 -->
+    <el-row :gutter="20">
+      <!-- 告警状态分布 -->
+      <el-col :span="8">
+        <el-card shadow="never" class="chart-card">
+          <template #header>告警状态分布</template>
+          <div ref="alertStatusPie" style="height: 300px;"></div>
+        </el-card>
+      </el-col>
+      <!-- 过去7日告警趋势 -->
+      <el-col :span="16">
+        <el-card shadow="never" class="chart-card">
+          <template #header>过去7日告警趋势</template>
+          <div ref="alertsPastWeekLine" style="height: 300px;"></div>
+        </el-card>
+      </el-col>
+    </el-row>
+
+    <!-- 最近告警 -->
+    <el-row>
+      <el-col :span="24">
+        <el-card shadow="never" class="latest-alerts-card">
+          <template #header>最近告警</template>
+          <el-table :data="latestAlerts" style="width: 100%" @row-click="goToAlertDetail">
+            <el-table-column prop="title" label="告警标题" />
+            <el-table-column prop="task_name" label="关联任务" width="180" />
+            <el-table-column prop="level" label="级别" width="100">
+              <template #default="{ row }">
+                <el-tag :type="getLevelType(row.level)">{{ getLevelText(row.level) }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="created_at" label="告警时间" width="200">
+               <template #default="{ row }">{{ formatTime(row.created_at) }}</template>
+            </el-table-column>
+          </el-table>
+        </el-card>
+      </el-col>
+    </el-row>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, onMounted, computed, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import { use } from 'echarts/core'
-import { CanvasRenderer } from 'echarts/renderers'
-import { LineChart, PieChart } from 'echarts/charts'
-import {
-  TitleComponent,
-  TooltipComponent,
-  LegendComponent,
-  GridComponent
-} from 'echarts/components'
-import VChart from 'vue-echarts'
-import {
-  Cpu,
-  VideoPlay,
-  Warning,
-  Bell,
-  ArrowUp,
-  ArrowDown,
-  ArrowRight
-} from '@element-plus/icons-vue'
+import * as echarts from 'echarts'
+import { getDashboardStats } from '@/api/dashboard'
+import { ElMessage } from 'element-plus'
+import { Tickets, VideoCamera, Menu, Warning } from '@element-plus/icons-vue'
 import dayjs from 'dayjs'
 
-use([
-  CanvasRenderer,
-  LineChart,
-  PieChart,
-  TitleComponent,
-  TooltipComponent,
-  LegendComponent,
-  GridComponent
-])
-
+const loading = ref(true)
 const router = useRouter()
-const alertTimeRange = ref('7')
 
-// 统计数据
-const stats = reactive([
-  {
-    title: '运行任务',
-    value: '12',
-    change: '+8',
-    trend: 'up',
-    icon: 'VideoPlay',
-    color: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-  },
-  {
-    title: '已部署模型',
-    value: '8',
-    change: '+2',
-    trend: 'up',
-    icon: 'Cpu',
-    color: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)'
-  },
-  {
-    title: '今日告警',
-    value: '23',
-    change: '-12',
-    trend: 'down',
-    icon: 'Warning',
-    color: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)'
-  },
-  {
-    title: '系统通知',
-    value: '5',
-    change: '+1',
-    trend: 'up',
-    icon: 'Bell',
-    color: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)'
-  }
+// Refs for chart elements
+const alertStatusPie = ref(null)
+const alertsPastWeekLine = ref(null)
+
+// Data
+const summaryData = ref({ total_tasks: 0, running_tasks: 0, total_models: 0, pending_alerts: 0 })
+const alertsByStatus = ref({ pending: 0, processing: 0, resolved: 0 })
+const alertsPastWeek = ref([])
+const latestAlerts = ref([])
+
+const summaryItems = computed(() => [
+  { title: '任务总数', value: summaryData.value.total_tasks, icon: Tickets, color: '#409EFF' },
+  { title: '运行中任务', value: summaryData.value.running_tasks, icon: VideoCamera, color: '#67C23A' },
+  { title: '模型总数', value: summaryData.value.total_models, icon: Menu, color: '#E6A23C' },
+  { title: '待处理告警', value: summaryData.value.pending_alerts, icon: Warning, color: '#F56C6C' },
 ])
 
-// 告警趋势图表
-const alertChartOption = ref({
-  tooltip: {
-    trigger: 'axis'
-  },
-  legend: {
-    data: ['告警数量', '处理数量']
-  },
-  grid: {
-    left: '3%',
-    right: '4%',
-    bottom: '3%',
-    containLabel: true
-  },
-  xAxis: {
-    type: 'category',
-    boundaryGap: false,
-    data: ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
-  },
-  yAxis: {
-    type: 'value'
-  },
-  series: [
-    {
-      name: '告警数量',
-      type: 'line',
-      smooth: true,
-      data: [12, 19, 15, 25, 22, 18, 23],
-      itemStyle: {
-        color: '#f56c6c'
-      },
-      areaStyle: {
-        color: {
-          type: 'linear',
-          x: 0,
-          y: 0,
-          x2: 0,
-          y2: 1,
-          colorStops: [
-            { offset: 0, color: 'rgba(245, 108, 108, 0.3)' },
-            { offset: 1, color: 'rgba(245, 108, 108, 0.1)' }
-          ]
-        }
-      }
-    },
-    {
-      name: '处理数量',
-      type: 'line',
-      smooth: true,
-      data: [10, 15, 12, 20, 18, 15, 19],
-      itemStyle: {
-        color: '#67c23a'
-      },
-      areaStyle: {
-        color: {
-          type: 'linear',
-          x: 0,
-          y: 0,
-          x2: 0,
-          y2: 1,
-          colorStops: [
-            { offset: 0, color: 'rgba(103, 194, 58, 0.3)' },
-            { offset: 1, color: 'rgba(103, 194, 58, 0.1)' }
-          ]
-        }
-      }
-    }
-  ]
-})
+const fetchData = async () => {
+  try {
+    loading.value = true
+    const stats = await getDashboardStats()
+    summaryData.value = stats.summary
+    alertsByStatus.value = stats.alerts_by_status
+    alertsPastWeek.value = stats.alerts_past_week
+    latestAlerts.value = stats.latest_alerts
+    await nextTick()
+    initCharts()
+  } catch (error) {
+    ElMessage.error('加载仪表盘数据失败')
+    console.error(error)
+  } finally {
+    loading.value = false
+  }
+}
 
-// 任务状态分布图表
-const taskChartOption = ref({
-  tooltip: {
-    trigger: 'item'
-  },
-  legend: {
-    orient: 'vertical',
-    left: 'left'
-  },
-  series: [
-    {
-      name: '任务状态',
+const initCharts = () => {
+  // Pie Chart
+  const pieChart = echarts.init(alertStatusPie.value)
+  pieChart.setOption({
+    tooltip: { trigger: 'item' },
+    legend: { top: 'bottom' },
+    series: [{
+      name: '告警状态',
       type: 'pie',
-      radius: '50%',
+      radius: ['40%', '70%'],
+      avoidLabelOverlap: false,
+      itemStyle: { borderRadius: 10, borderColor: '#fff', borderWidth: 2 },
       data: [
-        { value: 8, name: '运行中', itemStyle: { color: '#67c23a' } },
-        { value: 3, name: '已停止', itemStyle: { color: '#f56c6c' } },
-        { value: 1, name: '异常', itemStyle: { color: '#e6a23c' } }
+        { value: alertsByStatus.value.pending, name: '待处理' },
+        { value: alertsByStatus.value.processing, name: '处理中' },
+        { value: alertsByStatus.value.resolved, name: '已解决' },
       ],
-      emphasis: {
-        itemStyle: {
-          shadowBlur: 10,
-          shadowOffsetX: 0,
-          shadowColor: 'rgba(0, 0, 0, 0.5)'
-        }
-      }
-    }
-  ]
-})
+      emphasis: { itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: 'rgba(0, 0, 0, 0.5)' } }
+    }]
+  })
 
-// 最近告警数据
-const recentAlerts = ref([
-  {
-    id: 1,
-    title: '检测到异常行为',
-    task_name: '监控任务-01',
-    level: 'high',
-    status: 'pending',
-    created_at: '2024-01-15 14:30:00'
-  },
-  {
-    id: 2,
-    title: '置信度低于阈值',
-    task_name: '监控任务-02',
-    level: 'medium',
-    status: 'processing',
-    created_at: '2024-01-15 13:45:00'
-  },
-  {
-    id: 3,
-    title: '目标识别成功',
-    task_name: '监控任务-03',
-    level: 'low',
-    status: 'resolved',
-    created_at: '2024-01-15 12:20:00'
-  }
-])
-
-const getAlertIcon = (level) => {
-  const icons = {
-    high: 'Warning',
-    medium: 'InfoFilled',
-    low: 'SuccessFilled'
-  }
-  return icons[level] || 'InfoFilled'
+  // Line Chart
+  const lineChart = echarts.init(alertsPastWeekLine.value)
+  lineChart.setOption({
+    tooltip: { trigger: 'axis' },
+    xAxis: { type: 'category', data: alertsPastWeek.value.map(item => item.date) },
+    yAxis: { type: 'value' },
+    grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+    series: [{
+      name: '告警数',
+      data: alertsPastWeek.value.map(item => item.count),
+      type: 'line',
+      smooth: true
+    }]
+  })
 }
 
-const getStatusText = (status) => {
-  const statusMap = {
-    pending: '待处理',
-    processing: '处理中',
-    resolved: '已解决'
-  }
-  return statusMap[status] || status
-}
-
-const formatTime = (time) => {
-  return dayjs(time).format('MM-DD HH:mm')
-}
-
-const viewAlertDetail = (id) => {
-  router.push(`/alerts/${id}`)
-}
+// Utils
+const getLevelType = (level) => ({ high: 'danger', medium: 'warning', low: 'success' }[level] || 'info')
+const getLevelText = (level) => ({ high: '高', medium: '中', low: '低' }[level] || level)
+const formatTime = (time) => time ? dayjs(time).format('YYYY-MM-DD HH:mm:ss') : 'N/A'
+const goToAlertDetail = (row) => router.push(`/alerts/${row.id}`)
 
 onMounted(() => {
-  // 这里可以加载真实数据
-  console.log('仪表盘加载完成')
+  fetchData()
 })
 </script>
 
 <style scoped lang="scss">
 .dashboard-container {
-  padding: 20px;
+  padding: 24px;
 }
-
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 20px;
-  margin-bottom: 30px;
+.summary-row {
+  margin-bottom: 20px;
 }
-
-.stat-card {
+.summary-card .card-content {
   display: flex;
   align-items: center;
-  padding: 24px;
-  
-  .stat-icon {
+  .icon-wrapper {
     width: 60px;
     height: 60px;
-    border-radius: 12px;
+    border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
+    color: white;
+    font-size: 30px;
     margin-right: 20px;
   }
-  
-  .stat-content {
-    flex: 1;
-    
-    .stat-value {
-      font-size: 28px;
-      font-weight: 700;
-      color: var(--text-color);
-      margin-bottom: 4px;
-    }
-    
-    .stat-title {
+  .text-wrapper {
+    .title {
       font-size: 14px;
-      color: var(--text-color-secondary);
+      color: #909399;
       margin-bottom: 8px;
     }
-    
-    .stat-change {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      font-size: 12px;
-      font-weight: 600;
-      
-      &.up {
-        color: var(--success-color);
-      }
-      
-      &.down {
-        color: var(--danger-color);
-      }
-    }
-  }
-}
-
-.charts-grid {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 20px;
-  margin-bottom: 30px;
-  
-  @media (max-width: 1200px) {
-    grid-template-columns: 1fr;
-  }
-}
-
-.chart-card {
-  padding: 20px;
-  
-  .chart-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-    
-    h3 {
-      margin: 0;
-      font-size: 16px;
-      font-weight: 600;
-      color: var(--text-color);
-    }
-  }
-  
-  .chart-content {
-    height: 300px;
-  }
-}
-
-.recent-alerts {
-  padding: 20px;
-  
-  .card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-    
-    h3 {
-      margin: 0;
-      font-size: 16px;
-      font-weight: 600;
-      color: var(--text-color);
-    }
-  }
-}
-
-.alerts-list {
-  .alert-item {
-    display: flex;
-    align-items: center;
-    padding: 16px;
-    border-bottom: 1px solid var(--border-color);
-    cursor: pointer;
-    transition: background-color 0.3s;
-    
-    &:last-child {
-      border-bottom: none;
-    }
-    
-    &:hover {
-      background: var(--bg-color);
-    }
-    
-    .alert-icon {
-      width: 40px;
-      height: 40px;
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-right: 16px;
-      
-      &.high {
-        background: rgba(245, 108, 108, 0.1);
-        color: var(--danger-color);
-      }
-      
-      &.medium {
-        background: rgba(230, 162, 60, 0.1);
-        color: var(--warning-color);
-      }
-      
-      &.low {
-        background: rgba(103, 194, 58, 0.1);
-        color: var(--success-color);
-      }
-    }
-    
-    .alert-content {
-      flex: 1;
-      
-      .alert-title {
-        font-size: 14px;
-        font-weight: 600;
-        color: var(--text-color);
-        margin-bottom: 4px;
-      }
-      
-      .alert-info {
-        display: flex;
-        gap: 16px;
-        font-size: 12px;
-        color: var(--text-color-secondary);
-      }
-    }
-    
-    .alert-status {
-      padding: 4px 12px;
-      border-radius: 12px;
-      font-size: 12px;
-      font-weight: 600;
-      
-      &.pending {
-        background: rgba(230, 162, 60, 0.1);
-        color: var(--warning-color);
-      }
-      
-      &.processing {
-        background: rgba(64, 158, 255, 0.1);
-        color: var(--primary-color);
-      }
-      
-      &.resolved {
-        background: rgba(103, 194, 58, 0.1);
-        color: var(--success-color);
-      }
-    }
-  }
-}
-
-// 响应式
-@media (max-width: 768px) {
-  .dashboard-container {
-    padding: 10px;
-  }
-  
-  .stats-grid {
-    grid-template-columns: 1fr;
-    gap: 15px;
-  }
-  
-  .charts-grid {
-    gap: 15px;
-  }
-  
-  .stat-card {
-    padding: 16px;
-    
-    .stat-icon {
-      width: 50px;
-      height: 50px;
-      margin-right: 16px;
-    }
-    
-    .stat-value {
+    .value {
       font-size: 24px;
+      font-weight: bold;
     }
   }
+}
+.chart-card, .latest-alerts-card {
+  margin-bottom: 20px;
+}
+:deep(.el-card__header) {
+  font-weight: bold;
 }
 </style> 

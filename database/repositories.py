@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from .database import DatabaseManager
 from .models import User, UserCreate, Model, ModelCreate, ModelUpdate, InferenceRecord, InferenceRecordCreate, Task, TaskCreate, Alert, AlertCreate
 from passlib.context import CryptContext
@@ -167,8 +167,15 @@ class ModelRepository:
 
     def update_model_status(self, model_id: int, status: str) -> bool:
         query = "UPDATE models SET status = %s WHERE id = %s"
-        self.db.execute_query(query, (status, model_id), commit=True)
-        return True
+        params = [status, model_id]
+        self.db.execute_query(query, tuple(params), commit=True)
+        return self.get_model_by_id(model_id)
+
+    def get_total_count(self) -> int:
+        """Gets the total number of models."""
+        query = "SELECT COUNT(*) as total FROM models"
+        result = self.db.execute_query(query, fetch='one')
+        return result['total'] if result else 0
 
 class TaskRepository:
     def __init__(self):
@@ -320,9 +327,29 @@ class TaskRepository:
         self.db.execute_query(query, (task_id,), commit=True)
         return True
 
+    def get_task_counts_by_status(self) -> Dict[str, int]:
+        """Counts tasks grouped by their status."""
+        query = "SELECT status, COUNT(*) as count FROM tasks GROUP BY status"
+        result = self.db.execute_query(query, fetch='all')
+        return {row['status']: row['count'] for row in result} if result else {}
+
+    def get_total_count(self) -> int:
+        """Gets the total number of tasks."""
+        query = "SELECT COUNT(*) as total FROM tasks"
+        result = self.db.execute_query(query, fetch='one')
+        return result['total'] if result else 0
+
 class AlertRepository:
     def __init__(self):
         self.db = DatabaseManager()
+
+    def _process_alert_row(self, row: dict) -> dict:
+        """Helper to process a raw row from the alerts table."""
+        if not row:
+            return None
+        # Pydantic will handle type conversions for most fields.
+        # This is a good place to handle complex types like JSON if they existed.
+        return row
 
     def create_alert(self, alert: AlertCreate) -> Alert:
         query = """
@@ -359,15 +386,14 @@ class AlertRepository:
         return Alert(**result) if result else None
 
     def get_latest_alert_for_task(self, task_id: int, detection_class: str) -> Optional[Alert]:
-        """For debouncing: get the latest alert for a specific task and detection class."""
         query = """
         SELECT * FROM alerts 
-        WHERE task_id = %s AND detection_class = %s
-        ORDER BY created_at DESC
+        WHERE task_id = %s AND detection_class = %s 
+        ORDER BY created_at DESC 
         LIMIT 1
         """
         result = self.db.execute_query(query, (task_id, detection_class), fetch='one')
-        return Alert(**result) if result else None
+        return Alert(**self._process_alert_row(result)) if result else None
 
     def get_all_alerts(self, page: int = 1, page_size: int = 10, keyword: Optional[str] = None, level: Optional[str] = None, status: Optional[str] = None, start_date: Optional[str] = None, end_date: Optional[str] = None) -> dict:
         """
@@ -421,6 +447,43 @@ class AlertRepository:
         params = [status, alert_id]
         self.db.execute_query(query, tuple(params), commit=True)
         return self.get_alert_by_id(alert_id)
+
+    def get_alert_counts_by_status(self) -> Dict[str, int]:
+        """Counts alerts grouped by their status."""
+        query = "SELECT status, COUNT(*) as count FROM alerts GROUP BY status"
+        result = self.db.execute_query(query, fetch='all')
+        return {row['status']: row['count'] for row in result} if result else {}
+
+    def get_alert_counts_by_day(self, days: int = 7) -> List[Dict[str, Any]]:
+        """Counts alerts per day for the last N days."""
+        end_date = datetime.utcnow().date() + timedelta(days=1)
+        start_date = end_date - timedelta(days=days)
+
+        query = """
+        SELECT DATE(created_at) as date, COUNT(*) as count
+        FROM alerts
+        WHERE created_at >= %s AND created_at < %s
+        GROUP BY DATE(created_at)
+        ORDER BY date
+        """
+        params = [start_date, end_date]
+        
+        db_results = self.db.execute_query(query, tuple(params), fetch='all')
+        
+        # Create a dictionary for quick lookup
+        data_map = {item['date'].strftime('%Y-%m-%d'): item['count'] for item in db_results} if db_results else {}
+        
+        # Generate the full list of dates
+        date_list = [(start_date + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(days)]
+        
+        return [{'date': d, 'count': data_map.get(d, 0)} for d in date_list]
+
+    def get_latest_alerts(self, limit: int = 5) -> List[Alert]:
+        """Gets the most recent alerts."""
+        query = "SELECT * FROM alerts ORDER BY created_at DESC LIMIT %s"
+        params = [limit]
+        result = self.db.execute_query(query, tuple(params), fetch='all')
+        return [Alert(**row) for row in result] if result else []
 
 class InferenceRepository:
     def __init__(self):

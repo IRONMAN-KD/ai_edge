@@ -36,17 +36,17 @@
         </div>
         <div class="card-footer">
           <el-switch
-            v-model="task.status"
-            active-value="running"
-            inactive-value="stopped"
+            v-model="task.is_enabled"
+            :active-value="true"
+            :inactive-value="false"
             @change="handleStatusChange(task)"
             style="margin-right: 15px;"
           />
           <el-button-group>
-            <el-button size="small" :icon="View" @click="viewTask(task)" />
-            <el-button size="small" :icon="Edit" @click="openEditDialog(task)" />
-            <el-button size="small" :icon="Monitor" @click="openPreview(task)" />
-            <el-button size="small" :icon="Delete" @click="deleteTask(task)" />
+            <el-button size="small" :icon="View" @click="viewTask(task)" title="查看详情" />
+            <el-button size="small" :icon="Edit" @click="openEditDialog(task)" title="编辑任务" />
+            <el-button size="small" :icon="Monitor" @click="openPreview(task)" title="实时预览" />
+            <el-button size="small" :icon="Delete" @click="deleteTask(task)" title="删除任务" />
           </el-button-group>
         </div>
       </el-card>
@@ -220,8 +220,12 @@
     </el-dialog>
 
     <!-- 视频预览对话框 -->
-    <el-dialog v-model="showPreviewDialog" :title="`任务预览: ${selectedTask?.name}`" width="80vw" @close="selectedTask = null">
-      <VideoPreview v-if="showPreviewDialog && selectedTask" :task="selectedTask" />
+    <el-dialog v-model="showPreviewDialog" :title="`任务预览: ${selectedTask?.name}`" width="80vw" @close="selectedTask = null" destroy-on-close>
+      <VideoPreview 
+        v-if="showPreviewDialog && selectedTask" 
+        :task-id="selectedTask.id" 
+        :stream-url="`/api/tasks/${selectedTask.id}/stream`" 
+      />
     </el-dialog>
 
     <!-- ROI选择器对话框 -->
