@@ -6,9 +6,15 @@ python-jose[cryptography]
 mysql-connector-python
 opencv-python
 numpy
-pydantic
+pydantic[email]
 apscheduler
 pytz
 requests
 kafka-python
 paho-mqtt
+pymysql
+python-json-logger
+onnxruntime
+Pillow
+pyyaml
+python-multipart

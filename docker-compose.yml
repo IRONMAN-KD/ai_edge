@@ -9,7 +9,7 @@ services:
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: 'your_strong_root_password'
-      MYSQL_DATABASE: 'ai_edge_db'
+      MYSQL_DATABASE: 'ai_edge'
       MYSQL_USER: 'ai_edge_user'
       MYSQL_PASSWORD: 'your_strong_password'
     volumes:
@@ -24,7 +24,7 @@ services:
   backend:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: api/Dockerfile
     container_name: ai_edge_backend
     restart: unless-stopped
     depends_on:
@@ -32,18 +32,22 @@ services:
     ports:
       - "5001:5001"
     volumes:
+      - ./api:/app
+      - ./database:/app/database
+      - ./components:/app/components
+      - ./utils:/app/utils
       - ./alert_images:/app/alert_images
-      - ./models:/app/models
+      - ./models:/app/ml_models
       - ./videos:/app/videos
       - ./logs:/app/logs
       - ./config:/app/config
     environment:
       # These should match the 'db' service credentials
-      DB_HOST: 'db'
-      DB_USER: 'ai_edge_user'
-      DB_PASSWORD: 'your_strong_password'
-      DB_NAME: 'ai_edge_db'
-      DB_PORT: 3306 # Port inside the Docker network
+      MYSQL_HOST: 'db'
+      MYSQL_USER: 'ai_edge_user'
+      MYSQL_PASSWORD: 'your_strong_password'
+      MYSQL_DATABASE: 'ai_edge'
+      MYSQL_PORT: 3306 # Port inside the Docker network
     networks:
       - ai_edge_network
 

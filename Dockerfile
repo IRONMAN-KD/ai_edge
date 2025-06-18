@@ -12,9 +12,16 @@ ENV PYTHONDONTWRITEBYTECODE 1
 # Ensure Python output is sent straight to the terminal without buffering
 ENV PYTHONUNBUFFERED 1
 
-# Install system dependencies that might be needed by Python packages
-# For example, if you were using a library that needed gcc
-# RUN apt-get update && apt-get install -y gcc && rm -rf /var/lib/apt/lists/*
+# Install system dependencies needed by OpenCV and other libraries
+# Using a single RUN command to optimize layer usage and caching
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Minimal dependencies for OpenCV (headless)
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    # Optional: other dependencies your project might need
+    # For example, libgstreamer for video processing
+    # libgstreamer1.0-0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first to leverage Docker cache
 COPY requirements.txt .
@@ -43,13 +50,10 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y \
     python3-pip \
     python3-dev \
-    libgl1-mesa-glx \
-    libglib2.0-0 \
     libsm6 \
     libxext6 \
     libxrender-dev \
     libgomp1 \
-    libgstreamer1.0-0 \
     gstreamer1.0-plugins-base \
     gstreamer1.0-plugins-good \
     gstreamer1.0-plugins-bad \

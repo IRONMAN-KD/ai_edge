@@ -43,7 +43,7 @@ from database.repositories import (
     UserRepository, ModelRepository, InferenceRepository, 
     TaskRepository, AlertRepository, SystemConfigRepository
 )
-from api.models.factory import ModelFactory
+from models.factory import ModelFactory
 from components.push_notification import PushNotificationService
 
 # Add project root to Python path first
@@ -63,7 +63,7 @@ from database.models import (
     ModelStatusUpdate, ScheduleType, PaginatedAlertResponse, Alert, AlertStatus, AlertCreate
 )
 from database.repositories import UserRepository, ModelRepository, InferenceRepository, TaskRepository, AlertRepository
-from api.models.factory import ModelFactory
+from models.factory import ModelFactory
 
 load_dotenv()
 
@@ -387,32 +387,43 @@ async def upload_model_file(
     current_user: User = Depends(get_current_user),
     model_repo: ModelRepository = Depends(get_model_repository)
 ):
-    upload_dir = "uploads/models"
-    os.makedirs(upload_dir, exist_ok=True)
+    """
+    Uploads a model file, saves it, and creates a corresponding database entry.
+    """
+    # Create a directory for models if it doesn't exist
+    models_dir = "models"
+    os.makedirs(models_dir, exist_ok=True)
     
-    file_path = os.path.join(upload_dir, f"{name}_{version}_{file.filename}")
-    
-    with open(file_path, "wb") as buffer:
-        buffer.write(await file.read())
+    # Sanitize filename to prevent directory traversal attacks
+    sanitized_filename = os.path.basename(file.filename)
+    if not sanitized_filename:
+        raise HTTPException(status_code=400, detail="Invalid filename.")
+        
+    file_location = os.path.join(models_dir, sanitized_filename)
+
+    # Save the uploaded file
+    try:
+        with open(file_location, "wb+") as file_object:
+            file_object.write(file.file.read())
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Could not save file: {e}")
 
     try:
-        parsed_labels = json.loads(labels)
-        if not isinstance(parsed_labels, list):
-            raise ValueError("Labels must be a list.")
-    except (json.JSONDecodeError, ValueError) as e:
-        raise HTTPException(status_code=400, detail=f"Invalid format for labels: {e}")
+        labels_list = json.loads(labels)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid JSON format for labels.")
 
-    model_create = ModelCreate(
+    model_data = ModelCreate(
         name=name,
         version=version,
-        description=description,
         type=model_type,
-        file_path=file_path,
-        labels=parsed_labels,
+        description=description,
+        labels=labels_list,
+        model_path=sanitized_filename  # Save only the filename
     )
-    
-    created_model = model_repo.create_model(model_create)
-    return created_model
+
+    db_model = model_repo.create_model(model=model_data)
+    return db_model
 
 # Global reference to the scheduler jobs
 task_jobs = {}
@@ -482,40 +493,31 @@ async def listen_for_detections():
 
 def run_task_in_background(task_id: int, q: Queue):
     """
-    The actual function that runs in a separate process for a given task.
-    Initializes model and video capture, then enters a continuous loop
-    to process frames and run inference.
+    The main function that runs in a separate process for a given task.
+    It handles video capture, model inference, and alert generation.
     """
-    print(f"[{datetime.now()}] Starting background process for task {task_id}")
+    print(f"[{os.getpid()}] Starting background process for task {task_id}...")
     
     # Each process needs its own repository instances
     task_repo = TaskRepository()
-    model_repo = ModelRepository()
     alert_repo = AlertRepository()
-
+    
     try:
-        task = task_repo.get_task_by_id(task_id)
-        if not task:
-            print(f"ERROR: Task {task_id} not found when starting background process.")
+        task = task_repo.get_task(task_id)
+        if not task or not task.enabled:
+            print(f"Task {task_id} not found or is disabled. Exiting background process.")
             return
 
-        model_details = model_repo.get_model_by_id(task.model_id)
-        if not model_details or not model_details.status == 'active':
-            print(f"ERROR: Model {task.model_id} for task {task_id} not found or is not active.")
-            return
+        # Construct the full model path inside the container
+        model_path = os.path.join("/app/ml_models", task.model.model_path)
         
-        try:
-            print(f"Task {task_id}: Loading model {model_details.name} from {model_details.file_path}")
-            model = ModelFactory.create_model(
-                model_type=model_details.type,
-                model_path=model_details.file_path,
-                labels=model_details.labels
-            )
-            print(f"Task {task_id}: Model loaded successfully.")
-        except Exception as e:
-            print(f"FATAL: Failed to load model for task {task_id}. Error: {e}")
-            traceback.print_exc()
-            return
+        # Initialize the model using the factory
+        model_factory = ModelFactory()
+        model = model_factory.create_model(
+            model_type=task.model.type,
+            model_path=model_path,
+            labels=task.model.labels
+        )
 
         if not task.video_sources:
             print(f"ERROR: Task {task_id} has no video sources configured.")
@@ -638,7 +640,7 @@ def run_task_in_background(task_id: int, q: Queue):
                                 alert_create = AlertCreate(
                                     task_id=task.id,
                                     task_name=task.name,
-                                    model_name=model_details.name,
+                                    model_name=task.model.name,
                                     alert_image=url_image_path, # Use the same relative URL path for all
                                     confidence=confidence, # Store the raw float score (0.0 to 1.0)
                                     detection_class=class_name,
