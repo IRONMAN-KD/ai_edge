@@ -7,10 +7,12 @@
         <p>查看和处理系统告警信息</p>
       </div>
       <div class="header-right">
-        <el-button type="primary" @click="handleBatchProcess" icon="el-icon-finished">
+        <el-button type="primary" @click="handleBatchProcess">
+          <el-icon><Finished /></el-icon>
           批量处理
         </el-button>
-        <el-button @click="handleRefresh" icon="el-icon-refresh">
+        <el-button @click="handleRefresh">
+          <el-icon><Refresh /></el-icon>
           刷新
         </el-button>
       </div>
@@ -70,8 +72,8 @@
           <template #default="{ row }">
             <el-image 
               style="width: 70px; height: 50px; border-radius: 4px;"
-              :src="`/${(row.alert_image || '').replace(/^\/+/, '')}`" 
-              :preview-src-list="[`/${(row.alert_image || '').replace(/^\/+/, '')}`]"
+              :src="row.alert_image ? `/alert_images/${row.alert_image.replace(/^.*\//, '')}` : ''" 
+              :preview-src-list="row.alert_image ? [`/alert_images/${row.alert_image.replace(/^.*\//, '')}`] : []"
               fit="cover"
               :initial-index="0"
               hide-on-click-modal
@@ -211,7 +213,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Refresh, Search, Warning, InfoFilled, SuccessFilled, ArrowDown } from '@element-plus/icons-vue'
+import { Refresh, Search, Warning, InfoFilled, SuccessFilled, ArrowDown, Finished } from '@element-plus/icons-vue'
 import { getAlerts, updateAlert, deleteAlert as deleteAlertApi, batchUpdateAlerts } from '@/api/alerts'
 import dayjs from 'dayjs'
 
@@ -315,16 +317,14 @@ const confirmBatchProcess = async () => {
     ElMessage.warning('请选择处理状态')
     return
   }
-  
   try {
     batchProcessing.value = true
-    
     const ids = selectedAlerts.value.map(alert => alert.id)
-    await batchUpdateAlerts(ids, {
+    await batchUpdateAlerts({
+      ids,
       status: batchForm.status,
       remark: batchForm.remark
     })
-    
     ElMessage.success('批量处理成功')
     showBatchDialog.value = false
     resetBatchForm()
@@ -476,6 +476,11 @@ onMounted(() => {
       font-size: 14px;
       color: #909399;
     }
+  }
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
   }
 }
 

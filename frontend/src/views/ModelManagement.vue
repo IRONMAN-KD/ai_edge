@@ -93,6 +93,14 @@
             启用
           </el-button>
           <el-button :icon="Edit" type="primary" link @click="openEditDialog(model)">编辑</el-button>
+          <el-button 
+            v-if="model.status === 'inactive'"
+            :icon="Delete" 
+            type="danger" 
+            link
+            @click="deleteModel(model)">
+            删除
+          </el-button>
         </div>
       </el-card>
     </div>

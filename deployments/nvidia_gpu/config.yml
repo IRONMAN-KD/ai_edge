@@ -1,0 +1,66 @@
+# NVIDIA GPU平台配置
+platform:
+  name: "nvidia_gpu"
+  type: "NVIDIA GPU推理"
+  description: "基于TensorRT和ONNX Runtime GPU的加速推理引擎"
+
+# 推理引擎配置
+inference:
+  engine: "tensorrt"  # 优先使用TensorRT，回退到ONNX Runtime GPU
+  device: "cuda:0"
+  
+  # TensorRT配置
+  tensorrt:
+    workspace_size: 1073741824  # 1GB
+    max_batch_size: 8
+    fp16_mode: true
+    int8_mode: false
+    dla_core: -1
+    
+  # ONNX Runtime GPU配置
+  onnx:
+    providers: ["CUDAExecutionProvider", "CPUExecutionProvider"]
+    cuda_options:
+      device_id: 0
+      arena_extend_strategy: "kNextPowerOfTwo"
+      gpu_mem_limit: 2147483648  # 2GB
+      cudnn_conv_algo_search: "EXHAUSTIVE"
+  
+  # 模型配置
+  model:
+    input_size: [640, 640]
+    input_format: "RGB"
+    normalize: true
+    mean: [0.485, 0.456, 0.406]
+    std: [0.229, 0.224, 0.225]
+  
+  # 后处理配置
+  postprocess:
+    confidence_threshold: 0.5
+    nms_threshold: 0.4
+    max_detections: 100
+
+# 性能配置
+performance:
+  batch_size: 4
+  max_concurrent_requests: 8
+  timeout_seconds: 15
+  
+  # 内存管理
+  memory:
+    max_model_cache_mb: 4096
+    enable_memory_pool: true
+    gpu_memory_fraction: 0.8
+
+# GPU特定配置
+gpu:
+  device_id: 0
+  memory_growth: true
+  allow_memory_growth: true
+
+# 日志配置
+logging:
+  level: "INFO"
+  enable_performance_logs: true
+  log_inference_time: true
+  log_gpu_usage: true 

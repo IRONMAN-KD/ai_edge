@@ -1,0 +1,91 @@
+# AI Edge 部署配置
+# 指定当前使用的推理平台
+deployment:
+  # 可选值: cpu, nvidia_gpu, atlas_npu
+  platform: "cpu"
+  
+  # 部署模式
+  mode: "production"  # development, production
+  
+  # 服务端口配置
+  ports:
+    api: 8000
+    frontend: 3000
+    mysql: 3306
+    redis: 6379
+  
+  # 数据持久化配置
+  data_volumes:
+    mysql_data: "./data/mysql"
+    redis_data: "./data/redis"
+    model_storage: "./data/models"
+    alert_images: "./data/alert_images"
+    logs: "./data/logs"
+
+# 平台特定配置
+platforms:
+  cpu:
+    name: "CPU推理"
+    description: "基于ONNX Runtime的CPU推理，支持x86和ARM架构"
+    docker_compose: "cpu/docker-compose.yml"
+    requirements:
+      - "支持ONNX模型格式"
+      - "无需特殊硬件"
+    
+  nvidia_gpu:
+    name: "NVIDIA GPU推理"
+    description: "基于TensorRT的GPU加速推理"
+    docker_compose: "nvidia_gpu/docker-compose.yml"
+    requirements:
+      - "NVIDIA GPU (计算能力 >= 6.0)"
+      - "NVIDIA Docker运行时"
+      - "支持ONNX和TensorRT模型"
+    
+  atlas_npu:
+    name: "华为Atlas NPU推理"
+    description: "基于昇腾AI处理器的NPU推理"
+    docker_compose: "atlas_npu/docker-compose.yml"
+    requirements:
+      - "华为Atlas系列NPU"
+      - "昇腾CANN工具链"
+      - "支持OM模型格式"
+
+# 模型管理配置
+models:
+  # 支持的模型格式
+  supported_formats:
+    cpu: ["onnx"]
+    nvidia_gpu: ["onnx", "tensorrt", "trt"]
+    atlas_npu: ["om"]
+  
+  # 模型存储配置
+  storage:
+    max_size_mb: 500
+    allowed_types: ["person_detection", "object_detection", "classification"]
+  
+  # 默认模型配置
+  defaults:
+    input_size: [640, 640]
+    confidence_threshold: 0.5
+    nms_threshold: 0.4
+
+# 数据库配置
+database:
+  mysql:
+    host: "mysql"
+    port: 3306
+    database: "ai_edge"
+    username: "ai_edge_user"
+    password: "ai_edge_pass_2024"
+  
+  redis:
+    host: "redis"
+    port: 6379
+    database: 0
+
+# 日志配置
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  max_file_size: "10MB"
+  backup_count: 5 

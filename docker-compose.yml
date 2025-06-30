@@ -1,74 +1,118 @@
-version: '3.8'
-
 services:
   # Database Service (MySQL)
   db:
     image: mysql:8.0
-    container_name: ai_edge_db
-    command: --default-authentication-plugin=mysql_native_password
+    container_name: ai_edge_unified_db
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: 'your_strong_root_password'
+      MYSQL_ROOT_PASSWORD: 'ai_edge_root_2024'
       MYSQL_DATABASE: 'ai_edge'
       MYSQL_USER: 'ai_edge_user'
-      MYSQL_PASSWORD: 'your_strong_password'
+      MYSQL_PASSWORD: 'ai_edge_pass_2024'
     volumes:
       - db_data:/var/lib/mysql
-      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./src/database/init.sql:/docker-entrypoint-initdb.d/init.sql
     ports:
-      - "3307:3306" # Expose on 3307 to avoid conflict with local MySQL
+      - "3307:3306"
     networks:
       - ai_edge_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Redis Service (for caching and session management)
+  redis:
+    image: redis:7-alpine
+    container_name: ai_edge_unified_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - ai_edge_network
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
 
   # Backend API Service
   backend:
     build:
       context: .
-      dockerfile: api/Dockerfile
-    container_name: ai_edge_backend
+      dockerfile: src/api/Dockerfile
+    image: ai-edge-unified-backend:latest
+    container_name: ai_edge_unified_backend
     restart: unless-stopped
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
     ports:
-      - "5001:5001"
-    volumes:
-      - ./api:/app
-      - ./database:/app/database
-      - ./components:/app/components
-      - ./utils:/app/utils
-      - ./alert_images:/app/alert_images
-      - ./models:/app/ml_models
-      - ./videos:/app/videos
-      - ./logs:/app/logs
-      - ./config:/app/config
+      - "8000:8000"
     environment:
-      # These should match the 'db' service credentials
+      # Database configuration
       MYSQL_HOST: 'db'
       MYSQL_USER: 'ai_edge_user'
-      MYSQL_PASSWORD: 'your_strong_password'
+      MYSQL_PASSWORD: 'ai_edge_pass_2024'
       MYSQL_DATABASE: 'ai_edge'
-      MYSQL_PORT: 3306 # Port inside the Docker network
+      MYSQL_PORT: 3306
+      
+      # Redis configuration
+      REDIS_HOST: 'redis'
+      REDIS_PORT: 6379
+      
+      # Platform configuration
+      PLATFORM: 'cpu_x86'
+      
+      # API configuration
+      API_HOST: '0.0.0.0'
+      API_PORT: 8000
+      
+      # Logging
+      LOG_LEVEL: 'INFO'
+    volumes:
+      - ./models:/app/models
+      - ./configs:/app/configs:ro
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
     networks:
       - ai_edge_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   # Frontend Service
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: ai_edge_frontend
+    image: ai-edge-unified-frontend:latest
+    container_name: ai_edge_unified_frontend
     restart: unless-stopped
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     ports:
       - "8080:80"
+    environment:
+      - API_BASE_URL=http://backend:8000
     networks:
       - ai_edge_network
 
 networks:
   ai_edge_network:
     driver: bridge
+    name: ai_edge_unified_network
 
 volumes:
   db_data:
     driver: local
+    name: ai_edge_unified_db_data
+  redis_data:
+    driver: local
+    name: ai_edge_unified_redis_data 

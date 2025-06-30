@@ -1,0 +1,71 @@
+# 华为Atlas NPU平台配置
+platform:
+  name: "atlas_npu"
+  type: "华为Atlas NPU推理"
+  description: "基于昇腾AI处理器的NPU推理引擎"
+
+# 推理引擎配置
+inference:
+  engine: "acl"  # 昇腾计算语言
+  device: "npu:0"
+  
+  # ACL配置
+  acl:
+    device_id: 0
+    context_mode: "ACL_DEVICE"
+    memory_policy: "ACL_MEMORY_MALLOC_HUGE_FIRST"
+    
+  # 模型配置
+  model:
+    input_size: [640, 640]
+    input_format: "RGB"
+    normalize: true
+    mean: [0.485, 0.456, 0.406]
+    std: [0.229, 0.224, 0.225]
+    # OM模型特定配置
+    dynamic_batch: false
+    dynamic_hw: false
+    dynamic_dims: false
+  
+  # 后处理配置
+  postprocess:
+    confidence_threshold: 0.5
+    nms_threshold: 0.4
+    max_detections: 100
+
+# 性能配置
+performance:
+  batch_size: 1  # Atlas通常使用固定batch size
+  max_concurrent_requests: 4
+  timeout_seconds: 20
+  
+  # 内存管理
+  memory:
+    max_model_cache_mb: 2048
+    enable_memory_pool: true
+    npu_memory_fraction: 0.9
+
+# NPU特定配置
+npu:
+  device_id: 0
+  profiling_mode: false
+  dump_mode: false
+  
+  # 运行模式
+  run_mode: "ACL_DEVICE"  # ACL_HOST, ACL_DEVICE
+  
+  # 性能模式
+  performance_mode: "high_performance"  # high_performance, low_power
+
+# 环境配置
+environment:
+  ascend_rt_path: "/usr/local/Ascend/runtime"
+  ascend_driver_path: "/usr/local/Ascend/driver"
+  log_level: 1  # 0:DEBUG, 1:INFO, 2:WARNING, 3:ERROR
+
+# 日志配置
+logging:
+  level: "INFO"
+  enable_performance_logs: true
+  log_inference_time: true
+  log_npu_usage: true 

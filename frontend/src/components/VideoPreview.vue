@@ -17,7 +17,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue';
+import { ref, onMounted, onUnmounted, watch } from 'vue';
 import { useUserStore } from '@/stores/user';
 import { VideoCamera } from '@element-plus/icons-vue';
 
@@ -28,7 +28,7 @@ const props = defineProps({
   },
   streamUrl: {
     type: String,
-    default: '',
+    required: true,
   },
 });
 
@@ -43,10 +43,10 @@ const connectWebSocket = () => {
   if (!props.taskId || !userStore.token) return;
 
   const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  // Assuming the backend is on the same host, but different port during dev
-  const wsHost = import.meta.env.DEV ? 'localhost:5001' : window.location.host;
-  const wsUrl = `${wsProtocol}//${wsHost}/ws/tasks/${props.taskId}/stream?token=${userStore.token}`;
+  // 根据环境自动适配WebSocket地址 - Docker环境通过相对路径访问
+  const wsUrl = `${wsProtocol}//${window.location.host}/ws/tasks/${props.taskId}/stream?token=${userStore.token}`;
 
+  console.log("Attempting to connect to WebSocket:", wsUrl);
   ws.value = new WebSocket(wsUrl);
 
   ws.value.onopen = () => {
@@ -80,9 +80,11 @@ const drawDetections = (detections) => {
   
   if (naturalWidth === 0 || naturalHeight === 0) return;
 
-  // Sync canvas size with display size
   canvas.width = displayWidth;
   canvas.height = displayHeight;
+  
+  canvas.style.top = `${image.offsetTop}px`;
+  canvas.style.left = `${image.offsetLeft}px`;
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -126,14 +128,13 @@ onMounted(() => {
   
   if (containerRef.value) {
     resizeObserver = new ResizeObserver(() => {
-      // Redraw with latest detections when size changes
-      // This is a simplification; ideally, you'd store the last detections
-      // and redraw them. For now, we wait for the next message.
       const canvas = canvasRef.value;
       const image = imageRef.value;
       if (canvas && image) {
         canvas.width = image.clientWidth;
         canvas.height = image.clientHeight;
+        canvas.style.top = `${image.offsetTop}px`;
+        canvas.style.left = `${image.offsetLeft}px`;
       }
     });
     resizeObserver.observe(containerRef.value);
@@ -163,7 +164,7 @@ watch(() => props.taskId, (newId, oldId) => {
 .video-preview-container {
   position: relative;
   width: 100%;
-  height: 100%;
+  height: 60vh;
   background-color: #000;
   display: flex;
   justify-content: center;
@@ -176,15 +177,17 @@ watch(() => props.taskId, (newId, oldId) => {
 }
 .overlay-canvas {
   position: absolute;
-  top: 0;
-  left: 0;
-  pointer-events: none; /* Make canvas transparent to mouse events */
+  pointer-events: none;
 }
 .no-stream {
-  color: #fff;
+  color: #ccc;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  font-size: 1.2rem;
+  gap: 12px;
+}
+.no-stream .el-icon {
+  font-size: 3rem;
 }
 </style> 

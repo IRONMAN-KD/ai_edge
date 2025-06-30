@@ -9,7 +9,7 @@
       <template #header>
         <div class="card-header">
           <span>告警保留策略</span>
-          <el-button type="primary" :loading="saving" @click="saveRetentionConfig">保存设置</el-button>
+          <el-button type="primary" :loading="savingRetention" @click="saveRetentionConfig">保存设置</el-button>
         </div>
       </template>
 
@@ -40,7 +40,7 @@
       <template #header>
         <div class="card-header">
           <span>告警推送</span>
-           <el-button type="primary" :loading="saving" @click="savePushConfig">保存设置</el-button>
+           <el-button type="primary" :loading="savingPush" @click="savePushConfig">保存设置</el-button>
         </div>
       </template>
 
@@ -68,6 +68,48 @@
           <div v-if="form.push_notification.type === 'http'">
             <el-form-item label="Webhook URL">
               <el-input v-model="form.push_notification.url" placeholder="https://your-service.com/webhook" />
+            </el-form-item>
+            
+            <el-form-item>
+              <template #label>
+                <div class="form-item-label">
+                  <span>请求方法</span>
+                  <span class="form-item-desc">选择HTTP请求方法</span>
+                </div>
+              </template>
+              <el-select v-model="form.push_notification.method" placeholder="请求方法">
+                <el-option label="POST" value="POST" />
+                <el-option label="PUT" value="PUT" />
+                <el-option label="PATCH" value="PATCH" />
+                <el-option label="GET" value="GET" />
+              </el-select>
+            </el-form-item>
+            
+            <el-form-item>
+              <template #label>
+                <div class="form-item-label">
+                  <span>自定义请求头 (JSON格式)</span>
+                  <span class="form-item-desc">配置HTTP请求头部参数，如认证信息等。格式示例：{"Authorization": "Bearer token", "X-API-Key": "your-key"}</span>
+                </div>
+              </template>
+              <el-input 
+                v-model="headersText"
+                type="textarea" 
+                :rows="4"
+                placeholder='{"Authorization": "Bearer token", "Content-Type": "application/json", "X-API-Key": "your-key"}'
+                @blur="validateAndUpdateHeaders"
+              />
+              <div v-if="headersError" class="error-text">{{ headersError }}</div>
+            </el-form-item>
+            
+            <el-form-item>
+              <template #label>
+                <div class="form-item-label">
+                  <span>请求超时时间（秒）</span>
+                  <span class="form-item-desc">HTTP请求的超时时间</span>
+                </div>
+              </template>
+              <el-input-number v-model="form.push_notification.timeout" :min="1" :max="120" />
             </el-form-item>
           </div>
 
@@ -107,7 +149,10 @@ import { getSystemConfigs, updateSystemConfigs } from '@/api/system';
 import { ElMessage } from 'element-plus';
 
 const loading = ref(true);
-const saving = ref(false);
+const savingRetention = ref(false);
+const savingPush = ref(false);
+const headersText = ref('{}');
+const headersError = ref('');
 
 const form = reactive({
   alert_retention: {
@@ -118,6 +163,9 @@ const form = reactive({
     enabled: false,
     type: 'http',
     url: '',
+    method: 'POST',
+    headers: {},
+    timeout: 10,
     mqtt_broker: '',
     mqtt_port: 1883,
     mqtt_topic: '',
@@ -125,6 +173,26 @@ const form = reactive({
     kafka_topic: '',
   },
 });
+
+const validateAndUpdateHeaders = () => {
+  try {
+    headersError.value = '';
+    if (!headersText.value.trim()) {
+      form.push_notification.headers = {};
+      return;
+    }
+    
+    const parsed = JSON.parse(headersText.value);
+    if (typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error('Headers必须是JSON对象格式');
+    }
+    
+    form.push_notification.headers = parsed;
+  } catch (error) {
+    headersError.value = `JSON格式错误: ${error.message}`;
+    form.push_notification.headers = {};
+  }
+};
 
 const loadConfigs = async () => {
   loading.value = true;
@@ -139,6 +207,11 @@ const loadConfigs = async () => {
         ...form.push_notification,
         ...data.push_notification,
       };
+      
+      // 初始化headers文本框
+      if (form.push_notification.headers && typeof form.push_notification.headers === 'object') {
+        headersText.value = JSON.stringify(form.push_notification.headers, null, 2);
+      }
     }
   } catch (error) {
     ElMessage.error('加载系统配置失败');
@@ -149,7 +222,9 @@ const loadConfigs = async () => {
 };
 
 const saveRetentionConfig = async () => {
-  saving.value = true;
+  if (savingRetention.value) return; // 防止重复点击
+  
+  savingRetention.value = true;
   try {
     await updateSystemConfigs({ alert_retention: form.alert_retention });
     ElMessage.success('告警保留策略已保存');
@@ -157,12 +232,23 @@ const saveRetentionConfig = async () => {
     ElMessage.error('保存失败');
     console.error(error);
   } finally {
-    saving.value = false;
+    savingRetention.value = false;
   }
 };
 
 const savePushConfig = async () => {
-  saving.value = true;
+  if (savingPush.value) return; // 防止重复点击
+  
+  // 在保存前验证headers格式
+  if (form.push_notification.type === 'http') {
+    validateAndUpdateHeaders();
+    if (headersError.value) {
+      ElMessage.error('请修正Headers格式错误');
+      return;
+    }
+  }
+  
+  savingPush.value = true;
   try {
     await updateSystemConfigs({ push_notification: form.push_notification });
     ElMessage.success('告警推送配置已保存');
@@ -170,7 +256,7 @@ const savePushConfig = async () => {
     ElMessage.error('保存失败');
     console.error(error);
   } finally {
-    saving.value = false;
+    savingPush.value = false;
   }
 };
 
@@ -222,5 +308,12 @@ onMounted(loadConfigs);
     color: #909399;
     font-weight: normal;
   }
+}
+
+.error-text {
+  color: #f56c6c;
+  font-size: 12px;
+  margin-top: 4px;
+  line-height: 1.4;
 }
 </style> 

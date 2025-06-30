@@ -1,88 +1,80 @@
 import request from './request'
 
 // 获取告警列表
-export const getAlerts = (params) => {
+export function getAlerts(params) {
   return request({
-    url: '/alerts',
+    url: '/api/v1/alerts',
     method: 'get',
     params
   })
 }
 
-// 获取告警详情
-export const getAlert = (id) => {
+// 获取单个告警详情
+export function getAlert(id) {
   return request({
-    url: `/alerts/${id}`,
+    url: `/api/v1/alerts/${id}`,
     method: 'get'
   })
 }
 
-// 更新告警
-export const updateAlert = (id, data) => {
+// 更新告警状态
+export function updateAlert(id, data) {
   return request({
-    url: `/alerts/${id}`,
+    url: `/api/v1/alerts/${id}`,
     method: 'put',
     data
   })
 }
 
 // 删除告警
-export const deleteAlert = (id) => {
+export function deleteAlert(id) {
   return request({
-    url: `/alerts/${id}`,
+    url: `/api/v1/alerts/${id}`,
     method: 'delete'
   })
 }
 
-// 批量更新告警
-export const batchUpdateAlerts = (data) => {
+// 批量更新告警状态
+export function batchUpdateAlerts({ ids, status, remark }) {
   return request({
-    url: '/alerts/batch',
+    url: '/api/v1/alerts/batch',
     method: 'put',
-    data
+    data: { ids, status, remark }
   })
 }
 
 // 处理告警
-export const processAlert = (id, data) => {
-  return request({
-    url: `/alerts/${id}/process`,
-    method: 'post',
-    data
-  })
+export function processAlert(id, data) {
+  return updateAlert(id, data)
 }
 
 // 忽略告警
-export const ignoreAlert = (id, data) => {
-  return request({
-    url: `/alerts/${id}/ignore`,
-    method: 'post',
-    data
-  })
+export function ignoreAlert(id, data) {
+  return updateAlert(id, data)
 }
 
 // 获取告警统计
-export const getAlertStats = (params) => {
+export function getAlertStats(params) {
   return request({
-    url: '/alerts/stats',
+    url: '/api/v1/alerts/stats',
     method: 'get',
     params
   })
 }
 
 // 获取告警趋势
-export const getAlertTrends = (params) => {
+export function getAlertTrends(params) {
   return request({
-    url: '/alerts/trends',
+    url: '/api/v1/alerts/trends',
     method: 'get',
     params
   })
 }
 
 // 导出告警数据
-export const exportAlerts = (params) => {
+export function exportAlerts(params) {
   return request({
-    url: '/alerts/export',
+    url: '/api/v1/alerts/export',
     method: 'get',
     params,
     responseType: 'blob'
@@ -90,7 +82,7 @@ export const exportAlerts = (params) => {
 }
 
 // 获取告警日志
-export const getAlertLogs = (id, params) => {
+export function getAlertLogs(id, params) {
   return request({
     url: `/alerts/${id}/logs`,
     method: 'get',
@@ -99,7 +91,7 @@ export const getAlertLogs = (id, params) => {
 }
 
 // 添加告警备注
-export const addAlertRemark = (id, data) => {
+export function addAlertRemark(id, data) {
   return request({
     url: `/alerts/${id}/remark`,
     method: 'post',
@@ -108,17 +100,17 @@ export const addAlertRemark = (id, data) => {
 }
 
 // 获取告警配置
-export const getAlertConfig = () => {
+export function getAlertConfig() {
   return request({
-    url: '/alerts/config',
+    url: '/api/v1/alerts/config',
     method: 'get'
   })
 }
 
 // 更新告警配置
-export const updateAlertConfig = (data) => {
+export function updateAlertConfig(data) {
   return request({
-    url: '/alerts/config',
+    url: '/api/v1/alerts/config',
     method: 'put',
     data
   })

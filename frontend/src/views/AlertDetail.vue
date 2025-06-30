@@ -39,12 +39,12 @@
             </div>
           </template>
           <div class="image-container">
-            <el-image 
-              v-if="alertDetail.alert_image"
-              :src="`/${(alertDetail.alert_image || '').replace(/^\/+/, '')}`" 
-              class="alert-image"
-              fit="contain"
-              :preview-src-list="[`/${(alertDetail.alert_image || '').replace(/^\/+/, '')}`]"
+                    <el-image
+          v-if="alertDetail.alert_image"
+          :src="`/alert_images/${alertDetail.alert_image.replace(/^.*\//, '')}`"
+          class="alert-image"
+          fit="contain"
+          :preview-src-list="[`/alert_images/${alertDetail.alert_image.replace(/^.*\//, '')}`]"
               hide-on-click-modal
               preview-teleported
             />

@@ -3,24 +3,24 @@ import request from './request'
 // 获取任务列表
 export function getTasks(params) {
   return request({
-    url: '/tasks',
+    url: '/api/v1/tasks',
     method: 'get',
     params
   })
 }
 
-// 获取任务详情
+// 获取单个任务详情
 export function getTask(id) {
   return request({
-    url: `/tasks/${id}`,
+    url: `/api/v1/tasks/${id}`,
     method: 'get'
   })
 }
 
-// 创建任务
+// 创建新任务
 export function createTask(data) {
   return request({
-    url: '/tasks',
+    url: '/api/v1/tasks',
     method: 'post',
     data
   })
@@ -29,7 +29,7 @@ export function createTask(data) {
 // 更新任务
 export function updateTask(id, data) {
   return request({
-    url: `/tasks/${id}`,
+    url: `/api/v1/tasks/${id}`,
     method: 'put',
     data
   })
@@ -38,7 +38,7 @@ export function updateTask(id, data) {
 // 删除任务
 export function deleteTask(id) {
   return request({
-    url: `/tasks/${id}`,
+    url: `/api/v1/tasks/${id}`,
     method: 'delete'
   })
 }
@@ -46,7 +46,7 @@ export function deleteTask(id) {
 // 启动任务
 export function startTask(id) {
   return request({
-    url: `/tasks/${id}/start`,
+    url: `/api/v1/tasks/${id}/start`,
     method: 'post'
   })
 }
@@ -54,7 +54,7 @@ export function startTask(id) {
 // 停止任务
 export function stopTask(id) {
   return request({
-    url: `/tasks/${id}/stop`,
+    url: `/api/v1/tasks/${id}/stop`,
     method: 'post'
   })
 }
@@ -62,7 +62,7 @@ export function stopTask(id) {
 // 获取任务状态
 export function getTaskStatus(id) {
   return request({
-    url: `/tasks/${id}/status`,
+    url: `/api/v1/tasks/${id}/status`,
     method: 'get'
   })
 }
@@ -70,7 +70,7 @@ export function getTaskStatus(id) {
 // 批量操作任务
 export function batchUpdateTasks(data) {
   return request({
-    url: '/tasks/batch',
+    url: '/api/v1/tasks/batch',
     method: 'put',
     data
   })
@@ -79,7 +79,7 @@ export function batchUpdateTasks(data) {
 // 获取任务统计信息
 export function getTaskStats() {
   return request({
-    url: '/tasks/stats',
+    url: '/api/v1/tasks/stats',
     method: 'get'
   })
 }
@@ -87,7 +87,7 @@ export function getTaskStats() {
 // 获取任务日志
 export function getTaskLogs(id, params) {
   return request({
-    url: `/tasks/${id}/logs`,
+    url: `/api/v1/tasks/${id}/logs`,
     method: 'get',
     params
   })
@@ -96,7 +96,7 @@ export function getTaskLogs(id, params) {
 // 导出任务数据
 export function exportTasks(params) {
   return request({
-    url: '/tasks/export',
+    url: '/api/v1/tasks/export',
     method: 'get',
     params,
     responseType: 'blob'
@@ -106,7 +106,7 @@ export function exportTasks(params) {
 // 导入任务数据
 export function importTasks(data) {
   return request({
-    url: '/tasks/import',
+    url: '/api/v1/tasks/import',
     method: 'post',
     data,
     headers: {
@@ -115,11 +115,11 @@ export function importTasks(data) {
   })
 }
 
-// 获取视频源的一帧用于ROI选择
-export function getTaskFrame(source) {
+// 获取视频帧用于ROI选择
+export function getTaskFrame(sourceUrl) {
   return request({
-    url: '/tasks/frame',
+    url: '/api/v1/tasks/frame',
     method: 'post',
-    data: { source }
+    data: { source: sourceUrl }
   })
 } 

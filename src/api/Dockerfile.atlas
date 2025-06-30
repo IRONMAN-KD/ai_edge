@@ -1,0 +1,132 @@
+# Multi-stage build for optimal size and caching
+FROM ubuntu:22.04 AS base
+
+# Set timezone to avoid interactive prompts
+RUN ln -snf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && echo Asia/Shanghai > /etc/timezone
+
+# Install essential system packages
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    python3 \
+    python3-pip \
+    python3-dev \
+    libmariadb-dev \
+    pkg-config \
+    gcc \
+    g++ && \
+    update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 1 && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies (this layer changes only when requirements.txt changes)
+FROM base AS python-deps
+COPY requirements.txt /tmp/requirements.txt
+RUN python3 -m pip install --no-cache-dir --timeout 120 --retries 3 -r /tmp/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+# CANN installation stage with aggressive cleanup
+FROM python-deps AS cann-installer
+ARG CANN_PKG=Ascend-cann-toolkit_8.0.0_linux-aarch64.run
+ENV ASCEND_TOOLKIT_HOME=/usr/local/Ascend/ascend-toolkit/latest
+
+# Install CANN Toolkit and clean up aggressively in the same layer
+WORKDIR /tmp
+COPY ${CANN_PKG} .
+RUN chmod +x ./${CANN_PKG} && \
+    ./${CANN_PKG} --install --quiet --install-for-all --install-path=/usr/local/Ascend --chip=Ascend310 && \
+    rm -f ./${CANN_PKG} && \
+    # 验证安装
+    ls -la /usr/local/Ascend/ && \
+    # 保守的清理，只删除明确不需要的文件
+    cd /usr/local/Ascend && \
+    find . -name "*samples*" -type d -exec rm -rf {} + 2>/dev/null || true && \
+    find . -name "*doc*" -type d -exec rm -rf {} + 2>/dev/null || true && \
+    find . -name "*.tar.gz" -delete && \
+    find . -name "README*" -delete && \
+    # 保留所有运行时必需的文件和目录
+    echo "CANN installation preserved" && \
+    # Remove build tools and compilers
+    apt-get remove -y gcc g++ python3-dev && \
+    apt-get autoremove -y && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# Final optimized stage
+FROM ubuntu:22.04 AS final
+ENV ASCEND_TOOLKIT_HOME=/usr/local/Ascend/ascend-toolkit/latest
+
+# Install only essential runtime dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    python3 \
+    python3-pip \
+    libmariadb3 \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libgomp1 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgcc-s1 \
+    tzdata && \
+    update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 1 && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Set timezone
+RUN ln -snf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && echo Asia/Shanghai > /etc/timezone
+
+# Copy Python packages from python-deps stage
+COPY --from=python-deps /usr/local/lib/python3.10/dist-packages /usr/local/lib/python3.10/dist-packages
+COPY --from=python-deps /usr/local/bin /usr/local/bin
+
+# Copy cleaned CANN installation from cann-installer stage
+COPY --from=cann-installer /usr/local/Ascend /usr/local/Ascend
+
+# Set environment variables for CANN - use dynamic paths
+RUN ACTUAL_CANN_PATH=$(find /usr/local/Ascend -name "ascend-toolkit" -type d | head -1) && \
+    if [ -n "$ACTUAL_CANN_PATH" ]; then \
+        echo "export ASCEND_TOOLKIT_HOME=$ACTUAL_CANN_PATH/latest" >> /etc/environment; \
+        echo "export PATH=$ACTUAL_CANN_PATH/latest/bin:\$PATH" >> /etc/environment; \
+        echo "export LD_LIBRARY_PATH=$ACTUAL_CANN_PATH/latest/lib64:$ACTUAL_CANN_PATH/latest/aarch64-linux/devlib:/usr/local/Ascend/driver/lib64:$ACTUAL_CANN_PATH/latest/runtime/lib64" >> /etc/environment; \
+        echo "export PYTHONPATH=$ACTUAL_CANN_PATH/latest/python/site-packages:$ACTUAL_CANN_PATH/latest/aarch64-linux/pyACL/python/site-packages" >> /etc/environment; \
+        echo "export ASCEND_OPP_PATH=$ACTUAL_CANN_PATH/latest/opp" >> /etc/environment; \
+        echo "export ASCEND_AICPU_PATH=$ACTUAL_CANN_PATH/latest" >> /etc/environment; \
+        echo "CANN environment configured for: $ACTUAL_CANN_PATH"; \
+    else \
+        echo "WARNING: CANN installation not found!"; \
+    fi
+
+# Set static fallback environment variables
+ENV ASCEND_TOOLKIT_HOME=/usr/local/Ascend/ascend-toolkit/latest
+ENV PATH="/usr/local/Ascend/ascend-toolkit/latest/bin:${PATH}"
+ENV LD_LIBRARY_PATH="/usr/local/Ascend/ascend-toolkit/latest/lib64:/usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/devlib:/usr/local/Ascend/driver/lib64"
+ENV PYTHONPATH="/usr/local/Ascend/ascend-toolkit/latest/python/site-packages"
+ENV ASCEND_OPP_PATH="/usr/local/Ascend/ascend-toolkit/latest/opp"
+ENV ASCEND_AICPU_PATH="/usr/local/Ascend/ascend-toolkit/latest"
+
+# Create app directory and copy only necessary application code
+WORKDIR /app
+COPY api/ ./api/
+COPY components/ ./components/
+COPY config/ ./config/
+COPY database/ ./database/
+COPY utils/ ./utils/
+COPY fonts/ ./fonts/
+COPY requirements.txt ./
+
+# Expose port
+EXPOSE 5001
+
+# Create startup script to set dynamic environment
+RUN echo '#!/bin/bash' > /app/start.sh && \
+    echo 'source /etc/environment 2>/dev/null || true' >> /app/start.sh && \
+    echo 'export PYTHONPATH="/usr/local/Ascend/ascend-toolkit/latest/python/site-packages:/usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/pyACL/python/site-packages:$PYTHONPATH"' >> /app/start.sh && \
+    echo 'export LD_LIBRARY_PATH="/usr/local/Ascend/ascend-toolkit/latest/lib64:/usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/devlib:/usr/local/Ascend/driver/lib64:$LD_LIBRARY_PATH"' >> /app/start.sh && \
+    echo 'echo "Starting with CANN environment..."' >> /app/start.sh && \
+    echo 'echo "PYTHONPATH: $PYTHONPATH"' >> /app/start.sh && \
+    echo 'echo "LD_LIBRARY_PATH: $LD_LIBRARY_PATH"' >> /app/start.sh && \
+    echo 'exec uvicorn api.main:app --host 0.0.0.0 --port 5001 --proxy-headers --ws-ping-interval 20' >> /app/start.sh && \
+    chmod +x /app/start.sh
+
+# Final command to run the server
+CMD ["/app/start.sh"] 

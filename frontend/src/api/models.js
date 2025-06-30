@@ -3,7 +3,7 @@ import request from './request'
 // 获取模型列表（分页）
 export function getModels(params) {
   return request({
-    url: '/models',
+    url: '/api/v1/models',
     method: 'get',
     params
   })
@@ -12,7 +12,7 @@ export function getModels(params) {
 // 获取模型详情
 export function getModel(id) {
   return request({
-    url: `/models/${id}`,
+    url: `/api/v1/models/${id}`,
     method: 'get'
   })
 }
@@ -20,7 +20,7 @@ export function getModel(id) {
 // 创建模型
 export const createModel = (data) => {
   return request({
-    url: '/models',
+    url: '/api/v1/models',
     method: 'post',
     data
   })
@@ -29,7 +29,7 @@ export const createModel = (data) => {
 // 更新模型
 export function updateModel(id, data) {
   return request({
-    url: `/models/${id}`,
+    url: `/api/v1/models/${id}`,
     method: 'put',
     data
   })
@@ -38,7 +38,7 @@ export function updateModel(id, data) {
 // 删除模型
 export function deleteModel(id) {
   return request({
-    url: `/models/${id}`,
+    url: `/api/v1/models/${id}`,
     method: 'delete'
   })
 }
@@ -46,7 +46,7 @@ export function deleteModel(id) {
 // 上传模型
 export function uploadModel(data) {
   return request({
-    url: '/models/upload',
+    url: '/api/v1/models/upload',
     method: 'post',
     data,
     headers: {
@@ -58,7 +58,7 @@ export function uploadModel(data) {
 // 部署模型
 export function deployModel(id) {
   return request({
-    url: `/models/${id}/deploy`,
+    url: `/api/v1/models/${id}/deploy`,
     method: 'post'
   })
 }
@@ -66,7 +66,7 @@ export function deployModel(id) {
 // 取消部署模型
 export const undeployModel = (id) => {
   return request({
-    url: `/models/${id}/undeploy`,
+    url: `/api/v1/models/${id}/undeploy`,
     method: 'post'
   })
 }
@@ -74,7 +74,7 @@ export const undeployModel = (id) => {
 // 获取模型版本列表
 export const getModelVersions = (id) => {
   return request({
-    url: `/models/${id}/versions`,
+    url: `/api/v1/models/${id}/versions`,
     method: 'get'
   })
 }
@@ -82,7 +82,7 @@ export const getModelVersions = (id) => {
 // 获取模型性能指标
 export const getModelMetrics = (id, params) => {
   return request({
-    url: `/models/${id}/metrics`,
+    url: `/api/v1/models/${id}/metrics`,
     method: 'get',
     params
   })
@@ -91,7 +91,7 @@ export const getModelMetrics = (id, params) => {
 // 批量操作模型
 export const batchUpdateModels = (data) => {
   return request({
-    url: '/models/batch',
+    url: '/api/v1/models/batch',
     method: 'put',
     data
   })
@@ -100,7 +100,7 @@ export const batchUpdateModels = (data) => {
 // 导出模型配置
 export const exportModel = (id) => {
   return request({
-    url: `/models/${id}/export`,
+    url: `/api/v1/models/${id}/export`,
     method: 'get',
     responseType: 'blob'
   })
@@ -109,7 +109,7 @@ export const exportModel = (id) => {
 // 导入模型配置
 export const importModel = (data) => {
   return request({
-    url: '/models/import',
+    url: '/api/v1/models/import',
     method: 'post',
     data,
     headers: {
@@ -121,14 +121,14 @@ export const importModel = (data) => {
 // 获取单个模型详情
 export function getModelById(id) {
   return request({
-    url: `/models/${id}`,
+    url: `/api/v1/models/${id}`,
     method: 'get'
   })
 }
 
 export function updateModelStatus(id, status) {
   return request({
-    url: `/models/${id}/status`,
+    url: `/api/v1/models/${id}/status`,
     method: 'put',
     data: { status },
   });

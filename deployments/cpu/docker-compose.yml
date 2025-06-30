@@ -1,0 +1,98 @@
+version: '3.8'
+
+services:
+  # MySQL数据库
+  mysql:
+    image: mysql:8.0
+    container_name: ai_edge_mysql_cpu
+    environment:
+      MYSQL_ROOT_PASSWORD: root_pass_2024
+      MYSQL_DATABASE: ai_edge
+      MYSQL_USER: ai_edge_user
+      MYSQL_PASSWORD: ai_edge_pass_2024
+    ports:
+      - "3306:3306"
+    volumes:
+      - ../data/mysql:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "ai_edge_user", "-pai_edge_pass_2024"]
+      timeout: 20s
+      retries: 10
+      interval: 10s
+      start_period: 40s
+    restart: unless-stopped
+    networks:
+      - ai_edge_network
+
+  # Redis缓存
+  redis:
+    image: redis:7-alpine
+    container_name: ai_edge_redis_cpu
+    ports:
+      - "6379:6379"
+    volumes:
+      - ../data/redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      timeout: 3s
+      retries: 5
+      interval: 5s
+    restart: unless-stopped
+    networks:
+      - ai_edge_network
+
+  # 后端API服务 (CPU推理)
+  api:
+    build:
+      context: ../../
+      dockerfile: deployments/cpu/Dockerfile.api
+    container_name: ai_edge_api_cpu
+    environment:
+      - PLATFORM=cpu_arm
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_USER=ai_edge_user
+      - MYSQL_PASSWORD=ai_edge_pass_2024
+      - MYSQL_DATABASE=ai_edge
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../data/models:/app/models
+      - ../data/alert_images:/app/alert_images
+      - ../data/logs:/app/logs
+    depends_on:
+      - mysql
+      - redis
+    restart: unless-stopped
+    networks:
+      - ai_edge_network
+
+  # 前端服务
+  frontend:
+    build:
+      context: ../../frontend
+      dockerfile: Dockerfile
+    container_name: ai_edge_frontend_cpu
+    ports:
+      - "3000:80"
+    environment:
+      - API_BASE_URL=http://localhost:8000
+    depends_on:
+      - api
+    restart: unless-stopped
+    networks:
+      - ai_edge_network
+
+networks:
+  ai_edge_network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  redis_data:
+  model_storage:
+  alert_images:
+  logs: 

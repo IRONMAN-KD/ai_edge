@@ -1,0 +1,99 @@
+version: '3.8'
+
+services:
+  # MySQL数据库
+  mysql:
+    image: mysql:8.0
+    container_name: ai_edge_mysql_atlas
+    environment:
+      MYSQL_ROOT_PASSWORD: root_pass_2024
+      MYSQL_DATABASE: ai_edge
+      MYSQL_USER: ai_edge_user
+      MYSQL_PASSWORD: ai_edge_pass_2024
+    ports:
+      - "3306:3306"
+    volumes:
+      - ../data/mysql:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: unless-stopped
+    networks:
+      - ai_edge_network
+
+  # Redis缓存
+  redis:
+    image: redis:7-alpine
+    container_name: ai_edge_redis_atlas
+    ports:
+      - "6379:6379"
+    volumes:
+      - ../data/redis:/data
+    restart: unless-stopped
+    networks:
+      - ai_edge_network
+
+  # 后端API服务 (Atlas NPU推理)
+  api:
+    build:
+      context: ../../
+      dockerfile: deployments/atlas_npu/Dockerfile.api
+    container_name: ai_edge_api_atlas
+    environment:
+      - PLATFORM=atlas_npu
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_USER=ai_edge_user
+      - MYSQL_PASSWORD=ai_edge_pass_2024
+      - MYSQL_DATABASE=ai_edge
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - ASCEND_RT_PATH=/usr/local/Ascend/runtime
+      - LD_LIBRARY_PATH=/usr/local/Ascend/runtime/lib64:/usr/local/Ascend/driver/lib64
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../data/models:/app/models
+      - ../data/alert_images:/app/alert_images
+      - ../data/logs:/app/logs
+      # 挂载Atlas驱动和运行时
+      - /usr/local/Ascend:/usr/local/Ascend
+      - /var/log/npu:/var/log/npu
+    devices:
+      # 映射NPU设备
+      - /dev/davinci0:/dev/davinci0
+      - /dev/davinci_manager:/dev/davinci_manager
+      - /dev/devmm_svm:/dev/devmm_svm
+      - /dev/hisi_hdc:/dev/hisi_hdc
+    depends_on:
+      - mysql
+      - redis
+    restart: unless-stopped
+    networks:
+      - ai_edge_network
+    privileged: true  # Atlas NPU需要特权模式
+
+  # 前端服务
+  frontend:
+    build:
+      context: ../../frontend
+      dockerfile: Dockerfile
+    container_name: ai_edge_frontend_atlas
+    ports:
+      - "3000:80"
+    environment:
+      - API_BASE_URL=http://localhost:8000
+    depends_on:
+      - api
+    restart: unless-stopped
+    networks:
+      - ai_edge_network
+
+networks:
+  ai_edge_network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  redis_data:
+  model_storage:
+  alert_images:
+  logs: 

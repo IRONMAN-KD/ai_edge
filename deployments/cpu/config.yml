@@ -1,0 +1,50 @@
+# CPU平台配置
+platform:
+  name: "cpu_arm"
+  type: "CPU推理"
+  description: "基于ONNX Runtime的CPU推理引擎"
+
+# 推理引擎配置
+inference:
+  engine: "onnx"
+  device: "cpu"
+  
+  # ONNX Runtime配置
+  onnx:
+    providers: ["CPUExecutionProvider"]
+    session_options:
+      inter_op_num_threads: 0  # 使用所有可用线程
+      intra_op_num_threads: 0  # 使用所有可用线程
+      execution_mode: "sequential"
+      graph_optimization_level: "all"
+  
+  # 模型配置
+  model:
+    input_size: [640, 640]
+    input_format: "RGB"
+    normalize: true
+    mean: [0.485, 0.456, 0.406]
+    std: [0.229, 0.224, 0.225]
+  
+  # 后处理配置
+  postprocess:
+    confidence_threshold: 0.5
+    nms_threshold: 0.4
+    max_detections: 100
+
+# 性能配置
+performance:
+  batch_size: 1
+  max_concurrent_requests: 4
+  timeout_seconds: 30
+  
+  # 内存管理
+  memory:
+    max_model_cache_mb: 1024
+    enable_memory_pool: true
+
+# 日志配置
+logging:
+  level: "INFO"
+  enable_performance_logs: true
+  log_inference_time: true 

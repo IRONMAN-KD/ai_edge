@@ -1,0 +1,96 @@
+version: '3.8'
+
+services:
+  # MySQL数据库
+  mysql:
+    image: mysql:8.0
+    container_name: ai_edge_mysql_gpu
+    environment:
+      MYSQL_ROOT_PASSWORD: root_pass_2024
+      MYSQL_DATABASE: ai_edge
+      MYSQL_USER: ai_edge_user
+      MYSQL_PASSWORD: ai_edge_pass_2024
+    ports:
+      - "3306:3306"
+    volumes:
+      - ../data/mysql:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: unless-stopped
+    networks:
+      - ai_edge_network
+
+  # Redis缓存
+  redis:
+    image: redis:7-alpine
+    container_name: ai_edge_redis_gpu
+    ports:
+      - "6379:6379"
+    volumes:
+      - ../data/redis:/data
+    restart: unless-stopped
+    networks:
+      - ai_edge_network
+
+  # 后端API服务 (GPU推理)
+  api:
+    build:
+      context: ../../
+      dockerfile: deployments/nvidia_gpu/Dockerfile.api
+    container_name: ai_edge_api_gpu
+    environment:
+      - PLATFORM=nvidia_gpu
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_USER=ai_edge_user
+      - MYSQL_PASSWORD=ai_edge_pass_2024
+      - MYSQL_DATABASE=ai_edge
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - NVIDIA_VISIBLE_DEVICES=all
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../data/models:/app/models
+      - ../data/alert_images:/app/alert_images
+      - ../data/logs:/app/logs
+    depends_on:
+      - mysql
+      - redis
+    restart: unless-stopped
+    networks:
+      - ai_edge_network
+    # GPU支持
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  # 前端服务
+  frontend:
+    build:
+      context: ../../frontend
+      dockerfile: Dockerfile
+    container_name: ai_edge_frontend_gpu
+    ports:
+      - "3000:80"
+    environment:
+      - API_BASE_URL=http://localhost:8000
+    depends_on:
+      - api
+    restart: unless-stopped
+    networks:
+      - ai_edge_network
+
+networks:
+  ai_edge_network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  redis_data:
+  model_storage:
+  alert_images:
+  logs: 

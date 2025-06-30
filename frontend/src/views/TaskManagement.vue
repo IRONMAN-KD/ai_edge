@@ -8,19 +8,54 @@
       </el-button>
     </div>
 
+    <!-- 筛选条件 -->
+    <div class="filter-bar">
+      <el-input
+        v-model="searchKeyword"
+        placeholder="搜索任务名称..."
+        clearable
+        @input="handleSearch"
+        class="search-input"
+      >
+        <template #prefix>
+          <el-icon><Search /></el-icon>
+        </template>
+      </el-input>
+      <el-select v-model="statusFilter" placeholder="按状态筛选" clearable @change="handleSearch">
+        <el-option label="全部状态" value="" />
+        <el-option label="运行中" value="running" />
+        <el-option label="已停止" value="stopped" />
+        <el-option label="错误" value="error" />
+      </el-select>
+      <el-select v-model="modelFilter" placeholder="按模型筛选" clearable @change="handleSearch">
+        <el-option label="全部模型" value="" />
+        <el-option 
+          v-for="model in availableModels" 
+          :key="model.id" 
+          :label="model.name" 
+          :value="model.id" 
+        />
+      </el-select>
+      <el-select v-model="enabledFilter" placeholder="按启用状态筛选" clearable @change="handleSearch">
+        <el-option label="全部" value="" />
+        <el-option label="已启用" :value="true" />
+        <el-option label="已禁用" :value="false" />
+      </el-select>
+    </div>
+
     <!-- 任务卡片列表 -->
     <div v-if="tasks.length > 0" class="task-card-grid" v-loading="loading">
       <el-card v-for="task in tasks" :key="task.id" class="task-card">
         <template #header>
           <div class="card-header">
             <span class="task-name-card">{{ task.name }}</span>
-            <el-tag :type="getStatusType(task.status)" size="small">{{ getStatusText(task.status) }}</el-tag>
+            <el-tag :type="getStatusType(task.status, task.is_enabled)" size="small">{{ getStatusText(task.status, task.is_enabled) }}</el-tag>
           </div>
         </template>
         <div class="card-body">
           <div class="info-item">
             <el-icon><Menu /></el-icon>
-            <span><strong>模型:</strong> {{ task.model_name || 'N/A' }}</span>
+            <span><strong>模型:</strong> {{ task.model?.name || 'N/A' }}</span>
           </div>
           <div class="info-item">
             <el-icon><VideoCamera /></el-icon>
@@ -36,10 +71,8 @@
         </div>
         <div class="card-footer">
           <el-switch
-            v-model="task.is_enabled"
-            :active-value="true"
-            :inactive-value="false"
-            @change="handleStatusChange(task)"
+            :model-value="getTaskSwitchStatus(task)"
+            @change="handleStatusChange(task, $event)"
             style="margin-right: 15px;"
           />
           <el-button-group>
@@ -196,11 +229,10 @@
         <el-descriptions :column="2" border>
           <el-descriptions-item label="任务ID">{{ selectedTask.id }}</el-descriptions-item>
           <el-descriptions-item label="任务状态">
-            <el-tag :type="getStatusType(selectedTask.status)">{{ getStatusText(selectedTask.status) }}</el-tag>
-            <el-tag v-if="selectedTask.is_enabled === false" type="info" style="margin-left: 8px;">已禁用</el-tag>
+            <el-tag :type="getStatusType(selectedTask.status, selectedTask.is_enabled)">{{ getStatusText(selectedTask.status, selectedTask.is_enabled) }}</el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="任务名称">{{ selectedTask.name }}</el-descriptions-item>
-          <el-descriptions-item label="使用模型">{{ selectedTask.model_name }} (ID: {{ selectedTask.model_id }})</el-descriptions-item>
+          <el-descriptions-item label="使用模型">{{ selectedTask.model?.name }} (v{{ selectedTask.model?.version }}) (ID: {{ selectedTask.model_id }})</el-descriptions-item>
           <el-descriptions-item label="创建时间">{{ formatDate(selectedTask.create_time) }}</el-descriptions-item>
           <el-descriptions-item label="最后更新">{{ formatDate(selectedTask.update_time) }}</el-descriptions-item>
           <el-descriptions-item label="任务描述" :span="2">{{ selectedTask.description || '无' }}</el-descriptions-item>
@@ -219,12 +251,13 @@
       </div>
     </el-dialog>
 
-    <!-- 视频预览对话框 -->
-    <el-dialog v-model="showPreviewDialog" :title="`任务预览: ${selectedTask?.name}`" width="80vw" @close="selectedTask = null" destroy-on-close>
-      <VideoPreview 
-        v-if="showPreviewDialog && selectedTask" 
-        :task-id="selectedTask.id" 
-        :stream-url="`/api/tasks/${selectedTask.id}/stream`" 
+    <!-- 实时预览对话框 -->
+    <el-dialog v-model="showPreviewDialog" title="实时预览" width="80%" :close-on-click-modal="false" @close="closePreview">
+      <VideoPreview
+        v-if="selectedTask"
+        :key="selectedTask.id"
+        :task-id="selectedTask.id"
+        :stream-url="`/api/v1/tasks/${selectedTask.id}/stream`"
       />
     </el-dialog>
 
@@ -252,12 +285,20 @@
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, View, Delete, Monitor, Edit, Menu, VideoCamera, Timer, Tickets, Crop, InfoFilled } from '@element-plus/icons-vue'
-import { getTasks, createTask as apiCreateTask, updateTask as apiUpdateTask, deleteTask as apiDeleteTask, startTask as apiStartTask, stopTask as apiStopTask, getTaskFrame } from '@/api/tasks'
-import { getModels } from '@/api/models'
-import { formatDate } from '@/utils/formatters'
-import VideoPreview from '@/components/VideoPreview.vue'
+import { Plus, View, Edit, Delete, Timer, VideoCamera, Menu, Monitor, Crop, InfoFilled, Search } from '@element-plus/icons-vue'
+import { 
+  getTasks, 
+  createTask, 
+  updateTask, 
+  deleteTask as apiDeleteTask,
+  getTaskFrame, 
+  startTask, 
+  stopTask 
+} from '@/api/tasks.js'
+import { getModels } from '@/api/models.js'
+import { formatDate } from '@/utils/formatters.js'
 import RegionSelector from '@/components/RegionSelector.vue'
+import VideoPreview from '@/components/VideoPreview.vue'
 
 // 响应式数据
 const loading = ref(true)
@@ -265,6 +306,12 @@ const tasks = ref([])
 const total = ref(0)
 const currentPage = ref(1)
 const pageSize = ref(10)
+
+// 筛选条件
+const searchKeyword = ref('')
+const statusFilter = ref('')
+const modelFilter = ref('')
+const enabledFilter = ref('')
 
 // 创建/编辑任务相关
 const showEditDialog = ref(false)
@@ -291,9 +338,8 @@ const taskForm = reactive({
 
 // 详情相关
 const showDetailDialog = ref(false)
-const selectedTask = ref(null)
-
 const showPreviewDialog = ref(false)
+const selectedTask = ref(null)
 
 // ROI
 const showRoiDialog = ref(false);
@@ -361,10 +407,26 @@ const taskRules = {
 const fetchTasks = async () => {
   loading.value = true
   try {
-    const response = await getTasks({
+    const params = {
       page: currentPage.value,
       page_size: pageSize.value
-    })
+    }
+    
+    // 添加筛选参数
+    if (searchKeyword.value) {
+      params.keyword = searchKeyword.value
+    }
+    if (statusFilter.value) {
+      params.status = statusFilter.value
+    }
+    if (modelFilter.value) {
+      params.model_id = modelFilter.value
+    }
+    if (enabledFilter.value !== '') {
+      params.is_enabled = enabledFilter.value
+    }
+    
+    const response = await getTasks(params)
     tasks.value = response.items
     total.value = response.total
   } catch (error) {
@@ -380,8 +442,7 @@ const fetchAvailableModels = async () => {
   try {
     const response = await getModels({
       page: 1,
-      page_size: 1000, // 获取所有启用的模型
-      status: 'active'
+      page_size: 100 // 获取所有模型（后端限制最大100）
     })
     availableModels.value = response.items
   } catch (error) {
@@ -460,20 +521,29 @@ const resetTaskForm = () => {
 }
 
 // 创建或更新任务
-const saveTask = () => {
-  taskFormRef.value.validate(async (valid) => {
+const saveTask = async () => {
+  if (!taskFormRef.value) return
+  await taskFormRef.value.validate(async (valid) => {
     if (valid) {
       saving.value = true
-      // Create a payload without the 'id' field, which is not expected by the backend for create/update operations.
-      const payload = { ...taskForm }
-      delete payload.id
-
       try {
+        // Ensure status is consistent with the is_enabled flag
+        taskForm.status = taskForm.is_enabled ? 'running' : 'stopped';
+
+        // Deep copy and prepare payload
+        const payload = JSON.parse(JSON.stringify(taskForm));
+
+        // Format time range if necessary
+        if (taskForm.schedule_type !== 'continuous') {
+          payload.start_time = timeRange.value[0].toISOString().split('T')[1];
+          payload.end_time = timeRange.value[1].toISOString().split('T')[1];
+        }
+
         if (isEditMode.value) {
-          await apiUpdateTask(taskForm.id, payload)
+          await updateTask(taskForm.id, payload)
           ElMessage.success('任务更新成功')
         } else {
-          await apiCreateTask(payload)
+          await createTask(payload)
           ElMessage.success('任务创建成功')
         }
         showEditDialog.value = false
@@ -489,37 +559,9 @@ const saveTask = () => {
 
 // 查看任务详情
 const viewTask = (task) => {
-  selectedTask.value = task
-  showDetailDialog.value = true
-}
-
-// 启动任务
-const startTask = (task) => {
-  ElMessageBox.confirm(`确定要启动任务 "${task.name}" 吗？`, '确认', { type: 'info' })
-    .then(async () => {
-      try {
-        await apiStartTask(task.id)
-        ElMessage.success('任务已启动')
-        fetchTasks()
-      } catch (error) {
-        ElMessage.error('启动任务失败')
-      }
-    }).catch(() => {})
-}
-
-// 停止任务
-const stopTask = (task) => {
-  ElMessageBox.confirm(`确定要停止任务 "${task.name}" 吗？`, '确认', { type: 'warning' })
-    .then(async () => {
-      try {
-        await apiStopTask(task.id)
-        ElMessage.success('任务已停止')
-        fetchTasks()
-      } catch (error) {
-        ElMessage.error('停止任务失败')
-      }
-    }).catch(() => {})
-}
+  selectedTask.value = task;
+  showDetailDialog.value = true;
+};
 
 // 删除任务
 const deleteTask = (task) => {
@@ -530,30 +572,41 @@ const deleteTask = (task) => {
         ElMessage.success('任务删除成功')
         fetchTasks()
       } catch (error) {
-        ElMessage.error('删除任务失败')
+        ElMessage.error(`删除失败: ${error.message || '未知错误'}`)
       }
-    }).catch(() => {})
+    }).catch(() => {
+      ElMessage.info('已取消删除')
+    })
 }
 
 // 工具函数
-const getStatusType = (status) => {
+const getStatusType = (status, isEnabled = true) => {
+  // 统一状态逻辑：如果未启用或状态为stopped，显示为info；如果运行中显示为success；错误显示为danger
+  if (!isEnabled || status === 'stopped') {
+    return 'info' // 停止状态
+  }
   const types = {
-    'stopped': 'info',
     'running': 'success',
-    'error': 'danger',
-    'disabled': 'warning'
+    'error': 'danger'
   }
   return types[status] || 'info'
 }
 
-const getStatusText = (status) => {
-  const texts = {
-    'stopped': '已停止',
-    'running': '运行中',
-    'error': '错误',
-    'disabled': '已禁用'
+const getStatusText = (status, isEnabled = true) => {
+  // 统一状态文本：基于is_enabled和status的组合
+  if (!isEnabled || status === 'stopped') {
+    return '已停止'
   }
-  return texts[status] || status
+  const texts = {
+    'running': '运行中',
+    'error': '错误'
+  }
+  return texts[status] || '已停止'
+}
+
+// 获取任务开关状态 - 只有当任务启用且状态为运行中时才显示为开启
+const getTaskSwitchStatus = (task) => {
+  return task.is_enabled && task.status === 'running'
 }
 
 const getScheduleText = (task) => {
@@ -581,23 +634,26 @@ const getScheduleText = (task) => {
   }
 };
 
-const handleStatusChange = async (task) => {
-  const newStatus = task.status;
-  const actionText = newStatus === 'running' ? '启动' : '停止';
+const handleStatusChange = async (task, newStatus) => {
+  loading.value = true;
   try {
-    if (newStatus === 'running') {
-      await apiStartTask(task.id);
+    if (newStatus) {
+      await startTask(task.id);
+      ElMessage.success(`任务 "${task.name}" 已成功启动`);
     } else {
-      await apiStopTask(task.id);
+      await stopTask(task.id);
+      ElMessage.success(`任务 "${task.name}" 已成功停止`);
     }
-    ElMessage.success(`任务已${actionText}`);
+    // Refresh the entire list to get the latest status from backend
     await fetchTasks();
   } catch (error) {
-    ElMessage.error(`${actionText}任务失败`);
-    // Revert status on failure
-    task.status = newStatus === 'running' ? 'stopped' : 'running';
+    ElMessage.error(`操作失败: ${error.message || '未知错误'}`);
+    // Refresh tasks to get the correct state from backend
+    await fetchTasks();
+  } finally {
+    loading.value = false;
   }
-}
+};
 
 const addVideoSource = () => {
   taskForm.video_sources.push({ url: '', name: '', roi: null })
@@ -652,8 +708,19 @@ const confirmRoi = () => {
 };
 
 const openPreview = (task) => {
-  selectedTask.value = task
-  showPreviewDialog.value = true
+  selectedTask.value = task;
+  showPreviewDialog.value = true;
+};
+
+const closePreview = () => {
+  showPreviewDialog.value = false;
+  selectedTask.value = null;
+};
+
+// 处理搜索
+const handleSearch = () => {
+  currentPage.value = 1 // 重置到第一页
+  fetchTasks()
 }
 
 // 组件挂载时获取数据
@@ -818,5 +885,15 @@ onMounted(() => {
 
 .source-url-input {
   flex-grow: 1;
+}
+
+.filter-bar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.search-input {
+  width: 200px;
 }
 </style> 
