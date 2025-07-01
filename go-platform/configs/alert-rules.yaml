@@ -1,0 +1,625 @@
+# AI Edge Platform Alert Rules Configuration
+
+# 告警规则配置
+rules:
+  # 系统资源告警
+  - name: "high_cpu_usage"
+    description: "CPU使用率过高"
+    severity: "warning"
+    enabled: true
+    condition: "cpu_usage_percent > 80"
+    duration: "5m"
+    labels:
+      category: "system"
+      component: "cpu"
+    annotations:
+      summary: "CPU使用率过高"
+      description: "实例 {{ .instance }} 的CPU使用率已超过80%，当前值: {{ .value }}%"
+      runbook_url: "https://docs.company.com/runbooks/high-cpu"
+    actions:
+      - "log"
+      - "notify"
+    cooldown: "10m"
+    suppression:
+      - "maintenance_mode"
+
+  - name: "critical_cpu_usage"
+    description: "CPU使用率严重过高"
+    severity: "critical"
+    enabled: true
+    condition: "cpu_usage_percent > 95"
+    duration: "2m"
+    labels:
+      category: "system"
+      component: "cpu"
+    annotations:
+      summary: "CPU使用率严重过高"
+      description: "实例 {{ .instance }} 的CPU使用率已超过95%，当前值: {{ .value }}%，系统可能无响应"
+      runbook_url: "https://docs.company.com/runbooks/critical-cpu"
+    actions:
+      - "log"
+      - "notify"
+      - "escalate"
+    cooldown: "5m"
+
+  - name: "high_memory_usage"
+    description: "内存使用率过高"
+    severity: "warning"
+    enabled: true
+    condition: "memory_usage_percent > 85"
+    duration: "5m"
+    labels:
+      category: "system"
+      component: "memory"
+    annotations:
+      summary: "内存使用率过高"
+      description: "实例 {{ .instance }} 的内存使用率已超过85%，当前值: {{ .value }}%"
+      runbook_url: "https://docs.company.com/runbooks/high-memory"
+    actions:
+      - "log"
+      - "notify"
+    cooldown: "10m"
+
+  - name: "critical_memory_usage"
+    description: "内存使用率严重过高"
+    severity: "critical"
+    enabled: true
+    condition: "memory_usage_percent > 95"
+    duration: "2m"
+    labels:
+      category: "system"
+      component: "memory"
+    annotations:
+      summary: "内存使用率严重过高"
+      description: "实例 {{ .instance }} 的内存使用率已超过95%，当前值: {{ .value }}%，可能导致OOM"
+      runbook_url: "https://docs.company.com/runbooks/critical-memory"
+    actions:
+      - "log"
+      - "notify"
+      - "escalate"
+    cooldown: "5m"
+
+  - name: "high_disk_usage"
+    description: "磁盘使用率过高"
+    severity: "warning"
+    enabled: true
+    condition: "disk_usage_percent > 90"
+    duration: "5m"
+    labels:
+      category: "system"
+      component: "disk"
+    annotations:
+      summary: "磁盘使用率过高"
+      description: "实例 {{ .instance }} 的磁盘 {{ .device }} 使用率已超过90%，当前值: {{ .value }}%"
+      runbook_url: "https://docs.company.com/runbooks/high-disk"
+    actions:
+      - "log"
+      - "notify"
+    cooldown: "15m"
+
+  - name: "critical_disk_usage"
+    description: "磁盘使用率严重过高"
+    severity: "critical"
+    enabled: true
+    condition: "disk_usage_percent > 98"
+    duration: "2m"
+    labels:
+      category: "system"
+      component: "disk"
+    annotations:
+      summary: "磁盘使用率严重过高"
+      description: "实例 {{ .instance }} 的磁盘 {{ .device }} 使用率已超过98%，当前值: {{ .value }}%，磁盘即将满"
+      runbook_url: "https://docs.company.com/runbooks/critical-disk"
+    actions:
+      - "log"
+      - "notify"
+      - "escalate"
+    cooldown: "5m"
+
+  # 网络告警
+  - name: "high_network_usage"
+    description: "网络使用率过高"
+    severity: "warning"
+    enabled: true
+    condition: "network_usage_percent > 80"
+    duration: "5m"
+    labels:
+      category: "system"
+      component: "network"
+    annotations:
+      summary: "网络使用率过高"
+      description: "实例 {{ .instance }} 的网络接口 {{ .interface }} 使用率已超过80%，当前值: {{ .value }}%"
+      runbook_url: "https://docs.company.com/runbooks/high-network"
+    actions:
+      - "log"
+      - "notify"
+    cooldown: "10m"
+
+  # 应用告警
+  - name: "high_response_time"
+    description: "响应时间过长"
+    severity: "warning"
+    enabled: true
+    condition: "http_request_duration_seconds > 1.0"
+    duration: "5m"
+    labels:
+      category: "application"
+      component: "http"
+    annotations:
+      summary: "HTTP响应时间过长"
+      description: "端点 {{ .endpoint }} 的平均响应时间已超过1秒，当前值: {{ .value }}秒"
+      runbook_url: "https://docs.company.com/runbooks/high-response-time"
+    actions:
+      - "log"
+      - "notify"
+    cooldown: "10m"
+
+  - name: "high_error_rate"
+    description: "错误率过高"
+    severity: "warning"
+    enabled: true
+    condition: "http_request_error_rate > 5.0"
+    duration: "3m"
+    labels:
+      category: "application"
+      component: "http"
+    annotations:
+      summary: "HTTP错误率过高"
+      description: "端点 {{ .endpoint }} 的错误率已超过5%，当前值: {{ .value }}%"
+      runbook_url: "https://docs.company.com/runbooks/high-error-rate"
+    actions:
+      - "log"
+      - "notify"
+    cooldown: "10m"
+
+  - name: "critical_error_rate"
+    description: "错误率严重过高"
+    severity: "critical"
+    enabled: true
+    condition: "http_request_error_rate > 20.0"
+    duration: "1m"
+    labels:
+      category: "application"
+      component: "http"
+    annotations:
+      summary: "HTTP错误率严重过高"
+      description: "端点 {{ .endpoint }} 的错误率已超过20%，当前值: {{ .value }}%，服务可能不可用"
+      runbook_url: "https://docs.company.com/runbooks/critical-error-rate"
+    actions:
+      - "log"
+      - "notify"
+      - "escalate"
+    cooldown: "5m"
+
+  - name: "service_down"
+    description: "服务不可用"
+    severity: "critical"
+    enabled: true
+    condition: "up == 0"
+    duration: "1m"
+    labels:
+      category: "application"
+      component: "service"
+    annotations:
+      summary: "服务不可用"
+      description: "服务 {{ .service }} 在实例 {{ .instance }} 上不可用"
+      runbook_url: "https://docs.company.com/runbooks/service-down"
+    actions:
+      - "log"
+      - "notify"
+      - "escalate"
+      - "auto_restart"
+    cooldown: "5m"
+
+  # 数据库告警
+  - name: "database_connection_high"
+    description: "数据库连接数过高"
+    severity: "warning"
+    enabled: true
+    condition: "database_connections > 80"
+    duration: "5m"
+    labels:
+      category: "database"
+      component: "connections"
+    annotations:
+      summary: "数据库连接数过高"
+      description: "数据库连接数已超过80，当前值: {{ .value }}"
+      runbook_url: "https://docs.company.com/runbooks/db-connections"
+    actions:
+      - "log"
+      - "notify"
+    cooldown: "10m"
+
+  - name: "database_slow_query"
+    description: "数据库慢查询"
+    severity: "warning"
+    enabled: true
+    condition: "database_slow_queries_per_second > 1"
+    duration: "3m"
+    labels:
+      category: "database"
+      component: "queries"
+    annotations:
+      summary: "数据库慢查询过多"
+      description: "数据库慢查询每秒超过1个，当前值: {{ .value }}/s"
+      runbook_url: "https://docs.company.com/runbooks/slow-queries"
+    actions:
+      - "log"
+      - "notify"
+    cooldown: "15m"
+
+  - name: "database_deadlock"
+    description: "数据库死锁"
+    severity: "warning"
+    enabled: true
+    condition: "database_deadlocks_per_second > 0"
+    duration: "1m"
+    labels:
+      category: "database"
+      component: "deadlocks"
+    annotations:
+      summary: "数据库发生死锁"
+      description: "数据库发生死锁，每秒死锁数: {{ .value }}"
+      runbook_url: "https://docs.company.com/runbooks/deadlocks"
+    actions:
+      - "log"
+      - "notify"
+    cooldown: "5m"
+
+  # Redis告警
+  - name: "redis_memory_high"
+    description: "Redis内存使用率过高"
+    severity: "warning"
+    enabled: true
+    condition: "redis_memory_usage_percent > 80"
+    duration: "5m"
+    labels:
+      category: "cache"
+      component: "redis"
+    annotations:
+      summary: "Redis内存使用率过高"
+      description: "Redis内存使用率已超过80%，当前值: {{ .value }}%"
+      runbook_url: "https://docs.company.com/runbooks/redis-memory"
+    actions:
+      - "log"
+      - "notify"
+    cooldown: "10m"
+
+  - name: "redis_connection_high"
+    description: "Redis连接数过高"
+    severity: "warning"
+    enabled: true
+    condition: "redis_connected_clients > 100"
+    duration: "5m"
+    labels:
+      category: "cache"
+      component: "redis"
+    annotations:
+      summary: "Redis连接数过高"
+      description: "Redis连接数已超过100，当前值: {{ .value }}"
+      runbook_url: "https://docs.company.com/runbooks/redis-connections"
+    actions:
+      - "log"
+      - "notify"
+    cooldown: "10m"
+
+  # 模型推理告警
+  - name: "model_inference_latency_high"
+    description: "模型推理延迟过高"
+    severity: "warning"
+    enabled: true
+    condition: "model_inference_duration_seconds > 5.0"
+    duration: "3m"
+    labels:
+      category: "model"
+      component: "inference"
+    annotations:
+      summary: "模型推理延迟过高"
+      description: "模型 {{ .model }} 的推理延迟已超过5秒，当前值: {{ .value }}秒"
+      runbook_url: "https://docs.company.com/runbooks/model-latency"
+    actions:
+      - "log"
+      - "notify"
+    cooldown: "10m"
+
+  - name: "model_inference_error_rate_high"
+    description: "模型推理错误率过高"
+    severity: "warning"
+    enabled: true
+    condition: "model_inference_error_rate > 10.0"
+    duration: "3m"
+    labels:
+      category: "model"
+      component: "inference"
+    annotations:
+      summary: "模型推理错误率过高"
+      description: "模型 {{ .model }} 的推理错误率已超过10%，当前值: {{ .value }}%"
+      runbook_url: "https://docs.company.com/runbooks/model-errors"
+    actions:
+      - "log"
+      - "notify"
+    cooldown: "10m"
+
+  - name: "model_accuracy_low"
+    description: "模型准确率过低"
+    severity: "warning"
+    enabled: true
+    condition: "model_accuracy < 0.8"
+    duration: "10m"
+    labels:
+      category: "model"
+      component: "accuracy"
+    annotations:
+      summary: "模型准确率过低"
+      description: "模型 {{ .model }} 的准确率低于80%，当前值: {{ .value }}"
+      runbook_url: "https://docs.company.com/runbooks/model-accuracy"
+    actions:
+      - "log"
+      - "notify"
+    cooldown: "30m"
+
+  # 任务调度告警
+  - name: "task_queue_length_high"
+    description: "任务队列长度过高"
+    severity: "warning"
+    enabled: true
+    condition: "task_queue_length > 1000"
+    duration: "5m"
+    labels:
+      category: "scheduler"
+      component: "queue"
+    annotations:
+      summary: "任务队列长度过高"
+      description: "任务队列长度已超过1000，当前值: {{ .value }}"
+      runbook_url: "https://docs.company.com/runbooks/task-queue"
+    actions:
+      - "log"
+      - "notify"
+    cooldown: "10m"
+
+  - name: "task_failure_rate_high"
+    description: "任务失败率过高"
+    severity: "warning"
+    enabled: true
+    condition: "task_failure_rate > 20.0"
+    duration: "5m"
+    labels:
+      category: "scheduler"
+      component: "tasks"
+    annotations:
+      summary: "任务失败率过高"
+      description: "任务失败率已超过20%，当前值: {{ .value }}%"
+      runbook_url: "https://docs.company.com/runbooks/task-failures"
+    actions:
+      - "log"
+      - "notify"
+    cooldown: "15m"
+
+  - name: "worker_pool_exhausted"
+    description: "工作池耗尽"
+    severity: "critical"
+    enabled: true
+    condition: "worker_pool_active_workers >= worker_pool_max_workers"
+    duration: "2m"
+    labels:
+      category: "scheduler"
+      component: "workers"
+    annotations:
+      summary: "工作池耗尽"
+      description: "所有工作线程都在使用中，活跃工作线程: {{ .active_workers }}，最大工作线程: {{ .max_workers }}"
+      runbook_url: "https://docs.company.com/runbooks/worker-pool"
+    actions:
+      - "log"
+      - "notify"
+      - "scale_workers"
+    cooldown: "5m"
+
+  # 健康检查告警
+  - name: "health_check_failed"
+    description: "健康检查失败"
+    severity: "warning"
+    enabled: true
+    condition: "health_check_status == 0"
+    duration: "2m"
+    labels:
+      category: "health"
+      component: "check"
+    annotations:
+      summary: "健康检查失败"
+      description: "健康检查 {{ .check_name }} 失败，检查类型: {{ .check_type }}"
+      runbook_url: "https://docs.company.com/runbooks/health-check"
+    actions:
+      - "log"
+      - "notify"
+    cooldown: "5m"
+
+  - name: "dependency_unavailable"
+    description: "依赖服务不可用"
+    severity: "critical"
+    enabled: true
+    condition: "dependency_status == 0 AND dependency_critical == 1"
+    duration: "1m"
+    labels:
+      category: "health"
+      component: "dependency"
+    annotations:
+      summary: "关键依赖服务不可用"
+      description: "关键依赖服务 {{ .dependency_name }} 不可用，类型: {{ .dependency_type }}"
+      runbook_url: "https://docs.company.com/runbooks/dependency"
+    actions:
+      - "log"
+      - "notify"
+      - "escalate"
+    cooldown: "5m"
+
+  # 安全告警
+  - name: "authentication_failure_high"
+    description: "认证失败率过高"
+    severity: "warning"
+    enabled: true
+    condition: "authentication_failure_rate > 10.0"
+    duration: "5m"
+    labels:
+      category: "security"
+      component: "authentication"
+    annotations:
+      summary: "认证失败率过高"
+      description: "认证失败率已超过10%，当前值: {{ .value }}%，可能存在暴力破解攻击"
+      runbook_url: "https://docs.company.com/runbooks/auth-failures"
+    actions:
+      - "log"
+      - "notify"
+      - "block_ip"
+    cooldown: "10m"
+
+  - name: "rate_limit_exceeded"
+    description: "请求频率限制超出"
+    severity: "warning"
+    enabled: true
+    condition: "rate_limit_exceeded_count > 100"
+    duration: "5m"
+    labels:
+      category: "security"
+      component: "rate_limit"
+    annotations:
+      summary: "请求频率限制超出"
+      description: "请求频率限制超出次数已超过100，当前值: {{ .value }}"
+      runbook_url: "https://docs.company.com/runbooks/rate-limit"
+    actions:
+      - "log"
+      - "notify"
+    cooldown: "10m"
+
+  # 业务告警
+  - name: "user_registration_anomaly"
+    description: "用户注册异常"
+    severity: "info"
+    enabled: true
+    condition: "user_registrations_per_hour > 1000"
+    duration: "10m"
+    labels:
+      category: "business"
+      component: "users"
+    annotations:
+      summary: "用户注册数量异常"
+      description: "每小时用户注册数量已超过1000，当前值: {{ .value }}"
+      runbook_url: "https://docs.company.com/runbooks/user-registration"
+    actions:
+      - "log"
+      - "notify"
+    cooldown: "30m"
+
+  - name: "inference_volume_spike"
+    description: "推理请求量激增"
+    severity: "info"
+    enabled: true
+    condition: "inference_requests_per_minute > 10000"
+    duration: "5m"
+    labels:
+      category: "business"
+      component: "inference"
+    annotations:
+      summary: "推理请求量激增"
+      description: "每分钟推理请求量已超过10000，当前值: {{ .value }}"
+      runbook_url: "https://docs.company.com/runbooks/inference-spike"
+    actions:
+      - "log"
+      - "notify"
+      - "scale_inference"
+    cooldown: "15m"
+
+# 抑制规则
+suppressions:
+  - name: "maintenance_mode"
+    description: "维护模式抑制"
+    enabled: true
+    matchers:
+      maintenance: "true"
+    duration: "4h"
+    comment: "系统维护期间抑制所有告警"
+
+  - name: "known_issue"
+    description: "已知问题抑制"
+    enabled: false
+    matchers:
+      issue_id: "ISSUE-123"
+    duration: "24h"
+    comment: "已知问题，正在修复中"
+
+# 告警分组
+groups:
+  - name: "system_alerts"
+    description: "系统资源告警组"
+    rules:
+      - "high_cpu_usage"
+      - "critical_cpu_usage"
+      - "high_memory_usage"
+      - "critical_memory_usage"
+      - "high_disk_usage"
+      - "critical_disk_usage"
+      - "high_network_usage"
+    grouping:
+      by:
+        - "instance"
+        - "severity"
+      wait: "10s"
+      interval: "5m"
+      repeat_interval: "12h"
+
+  - name: "application_alerts"
+    description: "应用服务告警组"
+    rules:
+      - "high_response_time"
+      - "high_error_rate"
+      - "critical_error_rate"
+      - "service_down"
+    grouping:
+      by:
+        - "service"
+        - "endpoint"
+        - "severity"
+      wait: "5s"
+      interval: "3m"
+      repeat_interval: "6h"
+
+  - name: "database_alerts"
+    description: "数据库告警组"
+    rules:
+      - "database_connection_high"
+      - "database_slow_query"
+      - "database_deadlock"
+    grouping:
+      by:
+        - "database"
+        - "severity"
+      wait: "15s"
+      interval: "10m"
+      repeat_interval: "24h"
+
+  - name: "model_alerts"
+    description: "模型推理告警组"
+    rules:
+      - "model_inference_latency_high"
+      - "model_inference_error_rate_high"
+      - "model_accuracy_low"
+    grouping:
+      by:
+        - "model"
+        - "severity"
+      wait: "10s"
+      interval: "5m"
+      repeat_interval: "12h"
+
+# 全局配置
+global:
+  evaluation_interval: "30s"
+  alert_retention: "7d"
+  cooldown_period: "5m"
+  max_alerts_per_group: 100
+  max_groups_per_evaluation: 50
+  enable_recovery_notifications: true
+  enable_grouping: true
+  enable_suppression: true
+  default_severity: "warning"
+  default_duration: "5m"
+  default_cooldown: "10m"

@@ -1,0 +1,319 @@
+# golangci-lint 配置文件
+# 用于 Go 代码质量检查和静态分析
+
+# 运行配置
+run:
+  # 超时时间
+  timeout: 5m
+  # 要分析的目录
+  modules-download-mode: readonly
+  # 允许多个并行运行
+  allow-parallel-runners: true
+  # 跳过目录
+  skip-dirs:
+    - vendor
+    - tmp
+    - data
+    - logs
+    - uploads
+  # 跳过文件
+  skip-files:
+    - ".*\\.pb\\.go$"
+    - ".*\\.gen\\.go$"
+
+# 输出配置
+output:
+  # 输出格式: colored-line-number|line-number|json|tab|checkstyle|code-climate
+  format: colored-line-number
+  # 打印 linter 名称
+  print-issued-lines: true
+  # 打印 linter 名称
+  print-linter-name: true
+  # 使问题输出唯一
+  uniq-by-line: true
+  # 按路径前缀排序结果
+  sort-results: true
+
+# Linters 设置
+linters-settings:
+  # 错误检查
+  errcheck:
+    # 检查类型断言
+    check-type-assertions: true
+    # 检查空白赋值
+    check-blank: true
+    # 忽略的函数
+    ignore: fmt:.*,io/ioutil:^Read.*
+
+  # 循环复杂度
+  cyclop:
+    # 最大复杂度
+    max-complexity: 15
+    # 包级别的最大复杂度
+    package-average: 10.0
+    # 跳过测试
+    skip-tests: true
+
+  # 函数长度
+  funlen:
+    # 最大行数
+    lines: 100
+    # 最大语句数
+    statements: 50
+
+  # 认知复杂度
+  gocognit:
+    # 最小复杂度
+    min-complexity: 20
+
+  # 嵌套深度
+  nestif:
+    # 最小复杂度
+    min-complexity: 5
+
+  # Go 常量
+  goconst:
+    # 最小字符串长度
+    min-len: 3
+    # 最小出现次数
+    min-occurrences: 3
+    # 忽略测试
+    ignore-tests: true
+
+  # Go 关键字
+  gocritic:
+    # 启用的检查
+    enabled-tags:
+      - diagnostic
+      - experimental
+      - opinionated
+      - performance
+      - style
+    disabled-checks:
+      - dupImport # https://github.com/go-critic/go-critic/issues/845
+      - ifElseChain
+      - octalLiteral
+      - whyNoLint
+      - wrapperFunc
+      - importShadow # not important for now
+      - unnamedResult # not important
+
+  # 格式化
+  gofmt:
+    # 简化代码
+    simplify: true
+
+  # 导入
+  goimports:
+    # 本地包前缀
+    local-prefixes: go-platform
+
+  # 行长度
+  lll:
+    # 最大行长度
+    line-length: 120
+
+  # 魔法数字
+  gomnd:
+    # 忽略的数字
+    ignored-numbers: 0,1,2,3
+    # 忽略的函数
+    ignored-functions: strings.SplitN
+
+  # 拼写检查
+  misspell:
+    # 语言
+    locale: US
+    # 忽略的单词
+    ignore-words:
+      - someword
+
+  # 命名约定
+  revive:
+    # 最小置信度
+    min-confidence: 0
+    rules:
+      - name: blank-imports
+      - name: context-as-argument
+      - name: context-keys-type
+      - name: dot-imports
+      - name: error-return
+      - name: error-strings
+      - name: error-naming
+      - name: exported
+      - name: if-return
+      - name: increment-decrement
+      - name: var-naming
+      - name: var-declaration
+      - name: package-comments
+      - name: range
+      - name: receiver-naming
+      - name: time-naming
+      - name: unexported-return
+      - name: indent-error-flow
+      - name: errorf
+      - name: empty-block
+      - name: superfluous-else
+      - name: unused-parameter
+      - name: unreachable-code
+      - name: redefines-builtin-id
+
+  # 未使用的变量
+  unused:
+    # 检查导出的变量
+    check-exported: false
+
+  # 空白标识符
+  whitespace:
+    # 多行 if 语句
+    multi-if: false
+    # 多行函数
+    multi-func: false
+
+  # 结构体标签
+  tagliatelle:
+    # 检查的标签
+    case:
+      # 使用的规则
+      rules:
+        # JSON 标签使用蛇形命名
+        json: snake
+        # YAML 标签使用蛇形命名
+        yaml: snake
+        # XML 标签使用蛇形命名
+        xml: snake
+        # BSON 标签使用蛇形命名
+        bson: snake
+        # Avro 标签使用蛇形命名
+        avro: snake
+        # MapStructure 标签使用蛇形命名
+        mapstructure: snake
+
+# 启用的 linters
+linters:
+  # 禁用所有默认 linters
+  disable-all: true
+  # 启用特定的 linters
+  enable:
+    # 基础检查
+    - errcheck      # 检查未处理的错误
+    - gosimple      # 简化代码
+    - govet         # Go 官方检查工具
+    - ineffassign   # 检查无效赋值
+    - staticcheck   # 静态分析
+    - typecheck     # 类型检查
+    - unused        # 检查未使用的代码
+    
+    # 代码质量
+    - cyclop        # 循环复杂度
+    - dupl          # 重复代码检测
+    - funlen        # 函数长度
+    - gocognit      # 认知复杂度
+    - goconst       # 常量检查
+    - gocritic      # Go 代码审查
+    - gofmt         # 格式化检查
+    - goimports     # 导入检查
+    - gomnd         # 魔法数字
+    - nestif        # 嵌套深度
+    - prealloc      # 预分配检查
+    - revive        # 快速、可配置、可扩展、灵活和美观的 Go linter
+    - unconvert     # 不必要的类型转换
+    - unparam       # 未使用的参数
+    
+    # 安全检查
+    - gosec         # 安全检查
+    
+    # 性能检查
+    - bodyclose     # HTTP 响应体关闭检查
+    - noctx         # HTTP 请求上下文检查
+    
+    # 风格检查
+    - asciicheck    # ASCII 字符检查
+    - gofumpt       # 更严格的 gofmt
+    - lll           # 行长度检查
+    - misspell      # 拼写检查
+    - whitespace    # 空白字符检查
+    
+    # 导入检查
+    - depguard      # 依赖检查
+    - importas      # 导入别名检查
+    
+    # 注释检查
+    - godot         # 注释句号检查
+    - godox         # TODO/FIXME 检查
+    
+    # 结构体检查
+    - fieldalignment # 结构体字段对齐
+    - tagliatelle   # 结构体标签检查
+    
+    # 测试检查
+    - testpackage   # 测试包检查
+    - tparallel     # 并行测试检查
+
+# 问题配置
+issues:
+  # 排除使用默认排除规则
+  exclude-use-default: false
+  
+  # 排除的规则
+  exclude-rules:
+    # 排除测试文件的某些检查
+    - path: _test\.go
+      linters:
+        - gomnd
+        - funlen
+        - dupl
+        - lll
+    
+    # 排除 main 函数的复杂度检查
+    - path: cmd/
+      linters:
+        - funlen
+        - gocognit
+        - cyclop
+    
+    # 排除生成的文件
+    - path: "\\.pb\\.go"
+      linters:
+        - lll
+        - errcheck
+    
+    # 排除特定的错误消息
+    - text: "Error return value of .((os\\.)?std(out|err)\\..*|.*Close|.*Flush|os\\.Remove(All)?|.*printf?|os\\.(Un)?Setenv). is not checked"
+      linters:
+        - errcheck
+    
+    # 排除 G104: Errors unhandled
+    - text: "G104:"
+      linters:
+        - gosec
+    
+    # 排除 G204: Subprocess launched with variable
+    - text: "G204:"
+      linters:
+        - gosec
+  
+  # 最大问题数量，0 表示无限制
+  max-issues-per-linter: 0
+  
+  # 最大相同问题数量，0 表示无限制
+  max-same-issues: 0
+  
+  # 显示只在新代码中的问题
+  new: false
+  
+  # 修复问题
+  fix: false
+
+# 严重性配置
+severity:
+  # 默认严重性
+  default-severity: error
+  # 自定义严重性规则
+  rules:
+    - linters:
+        - dupl
+      severity: info
+    - linters:
+        - gomnd
+      severity: info

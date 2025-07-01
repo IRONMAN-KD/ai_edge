@@ -1,0 +1,3158 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# Dependency directories (remove the comment below to include it)
+# vendor/
+
+# Go workspace file
+go.work
+
+# Build directories
+build/
+dist/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+coverage.out
+coverage.html
+
+# nyc test coverage
+.nyc_output
+
+# Grunt intermediate storage (https://gruntjs.com/creating-plugins#storing-task-files)
+.grunt
+
+# Bower dependency directory (https://bower.io/)
+bower_components
+
+# node_modules (if using any Node.js tools)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Configuration files with sensitive data
+config/config.yaml
+config/config.yml
+config/local.yaml
+config/local.yml
+config/production.yaml
+config/production.yml
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Docker files
+.dockerignore
+
+# SSL certificates
+ssl/
+*.pem
+*.key
+*.crt
+*.csr
+
+# Backup files
+*.bak
+*.backup
+
+# Archive files
+*.tar
+*.tar.gz
+*.zip
+*.rar
+
+# Profile files
+*.prof
+cpu.prof
+mem.prof
+
+# Air (live reload) files
+.air.toml
+tmp/
+
+# Documentation build
+docs/build/
+docs/_build/
+
+# Swagger generated files
+docs/swagger.json
+docs/swagger.yaml
+
+# Test files
+*.test
+testdata/
+
+# Vendor directory
+vendor/
+
+# Go module cache
+go.sum.backup
+
+# Local development files
+local/
+dev/
+
+# Monitoring and metrics
+metrics/
+prometheus_data/
+grafana_data/
+
+# Cache directories
+.cache/
+cache/
+
+# Editor backup files
+*~
+*.swp
+*.swo
+.#*
+#*#
+
+# JetBrains IDEs
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Visual Studio Code
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# Local history
+.history/
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# Kubernetes
+*.kubeconfig
+
+# Helm
+*.tgz
+charts/*/charts/
+charts/*/requirements.lock
+
+# Local scripts
+scripts/local/
+
+# Performance test results
+benchmark_results/
+load_test_results/
+
+# Security scan results
+security_scan_results/
+
+# Local configuration overrides
+config.local.*
+config.dev.*
+config.test.*
+
+# Database migration files (if auto-generated)
+migrations/auto_*
+
+# API documentation
+api_docs/
+
+# Generated protobuf files
+*.pb.go
+
+# Wire generated files
+wire_gen.go
+
+# Mock files
+*_mock.go
+mocks/
+
+# Fuzz test files
+fuzz/
+
+# Air live reload
+.air.toml
+
+# GoReleaser
+dist/
+
+# Local development certificates
+*.localhost.pem
+*.localhost-key.pem
+
+# Local database files
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Backup and temporary database files
+*.sql.backup
+*.sql.tmp
+
+# Local storage
+storage/
+uploads/
+
+# Session files
+sessions/
+
+# PID files
+*.pid
+
+# Socket files
+*.sock
+
+# Core dumps
+core.*
+
+# Memory dumps
+*.dmp
+
+# Profiling files
+profile.out
+block.out
+mutex.out
+
+# Benchmark files
+bench.out
+
+# Race detector files
+race.out
+
+# Local development overrides
+.local/
+.dev/
+
+# Generated documentation
+_site/
+_build/
+
+# Temporary build artifacts
+.build/
+.tmp/
+
+# Local configuration
+.config/
+
+# Runtime directories
+run/
+var/
+
+# Lock files
+*.lock
+
+# Patch files
+*.patch
+*.diff
+
+# Backup directories
+backup/
+backups/
+
+# Archive directories
+archive/
+archives/
+
+# Export directories
+export/
+exports/
+
+# Import directories
+import/
+imports/
+
+# Reports
+reports/
+
+# Screenshots
+screenshots/
+
+# Videos
+videos/
+
+# Audio files
+audio/
+
+# Image files (if not part of the application)
+images/temp/
+images/cache/
+
+# Font files (if not part of the application)
+fonts/temp/
+fonts/cache/
+
+# Style files (if not part of the application)
+styles/temp/
+styles/cache/
+
+# Script files (if not part of the application)
+scripts/temp/
+scripts/cache/
+
+# Data files
+data/temp/
+data/cache/
+data/local/
+
+# Configuration cache
+config/cache/
+
+# Application cache
+app/cache/
+
+# System cache
+system/cache/
+
+# User cache
+user/cache/
+
+# Session cache
+session/cache/
+
+# Template cache
+template/cache/
+templates/cache/
+
+# Asset cache
+asset/cache/
+assets/cache/
+
+# Static file cache
+static/cache/
+
+# Public file cache
+public/cache/
+
+# Private file cache
+private/cache/
+
+# Secure file cache
+secure/cache/
+
+# Temporary upload files
+uploads/temp/
+uploads/tmp/
+
+# Processed files
+processed/
+
+# Generated files
+generated/
+
+# Compiled files
+compiled/
+
+# Optimized files
+optimized/
+
+# Minified files
+minified/
+
+# Compressed files
+compressed/
+
+# Encrypted files
+encrypted/
+
+# Signed files
+signed/
+
+# Verified files
+verified/
+
+# Validated files
+validated/
+
+# Sanitized files
+sanitized/
+
+# Filtered files
+filtered/
+
+# Sorted files
+sorted/
+
+# Indexed files
+indexed/
+
+# Cached files
+cached/
+
+# Buffered files
+buffered/
+
+# Queued files
+queued/
+
+# Pending files
+pending/
+
+# Processing files
+processing/
+
+# Completed files
+completed/
+
+# Failed files
+failed/
+
+# Error files
+error/
+errors/
+
+# Debug files
+debug/
+
+# Trace files
+trace/
+traces/
+
+# Audit files
+audit/
+audits/
+
+# Monitor files
+monitor/
+monitoring/
+
+# Metric files
+metric/
+
+# Health check files
+health/
+
+# Status files
+status/
+
+# State files
+state/
+states/
+
+# Event files
+event/
+events/
+
+# Message files
+message/
+messages/
+
+# Notification files
+notification/
+notifications/
+
+# Alert files
+alert/
+alerts/
+
+# Warning files
+warning/
+warnings/
+
+# Info files
+info/
+
+# Notice files
+notice/
+notices/
+
+# Announcement files
+announcement/
+announcements/
+
+# News files
+news/
+
+# Update files
+update/
+updates/
+
+# Patch files directory
+patches/
+
+# Fix files
+fix/
+fixes/
+
+# Hotfix files
+hotfix/
+hotfixes/
+
+# Release files
+release/
+releases/
+
+# Version files
+version/
+versions/
+
+# Tag files
+tag/
+tags/
+
+# Branch files
+branch/
+branches/
+
+# Commit files
+commit/
+commits/
+
+# Change files
+change/
+changes/
+
+# Diff files
+diff/
+diffs/
+
+# Merge files
+merge/
+merges/
+
+# Conflict files
+conflict/
+conflicts/
+
+# Resolution files
+resolution/
+resolutions/
+
+# Review files
+review/
+reviews/
+
+# Approval files
+approval/
+approvals/
+
+# Rejection files
+rejection/
+rejections/
+
+# Feedback files
+feedback/
+
+# Comment files
+comment/
+comments/
+
+# Discussion files
+discussion/
+discussions/
+
+# Issue files
+issue/
+issues/
+
+# Bug files
+bug/
+bugs/
+
+# Feature files
+feature/
+features/
+
+# Enhancement files
+enhancement/
+enhancements/
+
+# Improvement files
+improvement/
+improvements/
+
+# Optimization files
+optimization/
+optimizations/
+
+# Refactor files
+refactor/
+refactors/
+
+# Cleanup files
+cleanup/
+
+# Maintenance files
+maintenance/
+
+# Support files
+support/
+
+# Help files
+help/
+
+# Documentation files
+documentation/temp/
+documentation/cache/
+
+# Tutorial files
+tutorial/
+tutorials/
+
+# Example files
+example/temp/
+examples/temp/
+
+# Sample files
+sample/temp/
+samples/temp/
+
+# Demo files
+demo/temp/
+demos/temp/
+
+# Test files
+test/temp/
+tests/temp/
+
+# Spec files
+spec/temp/
+specs/temp/
+
+# Mock files
+mock/temp/
+
+# Stub files
+stub/temp/
+stubs/temp/
+
+# Fake files
+fake/temp/
+fakes/temp/
+
+# Dummy files
+dummy/temp/
+dummies/temp/
+
+# Placeholder files
+placeholder/
+placeholders/
+
+# Template files
+template/temp/
+
+# Scaffold files
+scaffold/
+scaffolds/
+
+# Generator files
+generator/
+generators/
+
+# Builder files
+builder/
+builders/
+
+# Compiler files
+compiler/
+compilers/
+
+# Interpreter files
+interpreter/
+interpreters/
+
+# Parser files
+parser/
+parsers/
+
+# Lexer files
+lexer/
+lexers/
+
+# Tokenizer files
+tokenizer/
+tokenizers/
+
+# Analyzer files
+analyzer/
+analyzers/
+
+# Validator files
+validator/temp/
+validators/temp/
+
+# Formatter files
+formatter/
+formatters/
+
+# Linter files
+linter/
+linters/
+
+# Checker files
+checker/
+checkers/
+
+# Scanner files
+scanner/
+scanners/
+
+# Detector files
+detector/
+detectors/
+
+# Inspector files
+inspector/
+inspectors/
+
+# Profiler files
+profiler/
+profilers/
+
+# Debugger files
+debugger/
+debuggers/
+
+# Tracer files
+tracer/
+tracers/
+
+# Logger files
+logger/temp/
+loggers/temp/
+
+# Reporter files
+reporter/
+reporters/
+
+# Exporter files
+exporter/
+exporters/
+
+# Importer files
+importer/
+importers/
+
+# Converter files
+converter/
+converters/
+
+# Transformer files
+transformer/
+transformers/
+
+# Processor files
+processor/
+processors/
+
+# Handler files
+handler/temp/
+handlers/temp/
+
+# Controller files
+controller/temp/
+controllers/temp/
+
+# Service files
+service/temp/
+services/temp/
+
+# Repository files
+repository/temp/
+repositories/temp/
+
+# Model files
+model/temp/
+models/temp/
+
+# Entity files
+entity/temp/
+entities/temp/
+
+# DTO files
+dto/temp/
+dtos/temp/
+
+# VO files
+vo/temp/
+vos/temp/
+
+# DAO files
+dao/temp/
+daos/temp/
+
+# Mapper files
+mapper/temp/
+mappers/temp/
+
+# Adapter files
+adapter/temp/
+adapters/temp/
+
+# Wrapper files
+wrapper/temp/
+wrappers/temp/
+
+# Proxy files
+proxy/temp/
+proxies/temp/
+
+# Factory files
+factory/temp/
+factories/temp/
+
+# Builder files
+builder/temp/
+
+# Strategy files
+strategy/temp/
+strategies/temp/
+
+# Observer files
+observer/temp/
+observers/temp/
+
+# Listener files
+listener/temp/
+listeners/temp/
+
+# Event files
+event/temp/
+
+# Command files
+command/temp/
+commands/temp/
+
+# Query files
+query/temp/
+queries/temp/
+
+# Request files
+request/temp/
+requests/temp/
+
+# Response files
+response/temp/
+responses/temp/
+
+# Message files
+message/temp/
+
+# Notification files
+notification/temp/
+
+# Alert files
+alert/temp/
+
+# Error files
+error/temp/
+
+# Exception files
+exception/temp/
+exceptions/temp/
+
+# Middleware files
+middleware/temp/
+
+# Filter files
+filter/temp/
+filters/temp/
+
+# Interceptor files
+interceptor/temp/
+interceptors/temp/
+
+# Guard files
+guard/temp/
+guards/temp/
+
+# Decorator files
+decorator/temp/
+decorators/temp/
+
+# Plugin files
+plugin/temp/
+plugins/temp/
+
+# Extension files
+extension/temp/
+extensions/temp/
+
+# Module files
+module/temp/
+modules/temp/
+
+# Package files
+package/temp/
+packages/temp/
+
+# Library files
+library/temp/
+libraries/temp/
+
+# Framework files
+framework/temp/
+frameworks/temp/
+
+# Tool files
+tool/temp/
+tools/temp/
+
+# Utility files
+utility/temp/
+utilities/temp/
+util/temp/
+utils/temp/
+
+# Helper files
+helper/temp/
+helpers/temp/
+
+# Common files
+common/temp/
+
+# Shared files
+shared/temp/
+
+# Core files
+core/temp/
+
+# Base files
+base/temp/
+
+# Abstract files
+abstract/temp/
+
+# Interface files
+interface/temp/
+interfaces/temp/
+
+# Contract files
+contract/temp/
+contracts/temp/
+
+# Protocol files
+protocol/temp/
+protocols/temp/
+
+# Schema files
+schema/temp/
+schemas/temp/
+
+# Definition files
+definition/temp/
+definitions/temp/
+
+# Declaration files
+declaration/temp/
+declarations/temp/
+
+# Specification files
+specification/temp/
+specifications/temp/
+
+# Configuration files
+configuration/temp/
+configurations/temp/
+
+# Setting files
+setting/temp/
+settings/temp/
+
+# Option files
+option/temp/
+options/temp/
+
+# Parameter files
+parameter/temp/
+parameters/temp/
+
+# Argument files
+argument/temp/
+arguments/temp/
+
+# Variable files
+variable/temp/
+variables/temp/
+
+# Constant files
+constant/temp/
+constants/temp/
+
+# Enum files
+enum/temp/
+enums/temp/
+
+# Type files
+type/temp/
+types/temp/
+
+# Class files
+class/temp/
+classes/temp/
+
+# Struct files
+struct/temp/
+structs/temp/
+
+# Function files
+function/temp/
+functions/temp/
+
+# Method files
+method/temp/
+methods/temp/
+
+# Procedure files
+procedure/temp/
+procedures/temp/
+
+# Routine files
+routine/temp/
+routines/temp/
+
+# Algorithm files
+algorithm/temp/
+algorithms/temp/
+
+# Logic files
+logic/temp/
+
+# Rule files
+rule/temp/
+rules/temp/
+
+# Policy files
+policy/temp/
+policies/temp/
+
+# Permission files
+permission/temp/
+permissions/temp/
+
+# Role files
+role/temp/
+roles/temp/
+
+# User files
+user/temp/
+users/temp/
+
+# Group files
+group/temp/
+groups/temp/
+
+# Team files
+team/temp/
+teams/temp/
+
+# Organization files
+organization/temp/
+organizations/temp/
+
+# Company files
+company/temp/
+companies/temp/
+
+# Department files
+department/temp/
+departments/temp/
+
+# Division files
+division/temp/
+divisions/temp/
+
+# Section files
+section/temp/
+sections/temp/
+
+# Unit files
+unit/temp/
+units/temp/
+
+# Component files
+component/temp/
+components/temp/
+
+# Element files
+element/temp/
+elements/temp/
+
+# Item files
+item/temp/
+items/temp/
+
+# Object files
+object/temp/
+objects/temp/
+
+# Instance files
+instance/temp/
+instances/temp/
+
+# Reference files
+reference/temp/
+references/temp/
+
+# Pointer files
+pointer/temp/
+pointers/temp/
+
+# Link files
+link/temp/
+links/temp/
+
+# Connection files
+connection/temp/
+connections/temp/
+
+# Relation files
+relation/temp/
+relations/temp/
+
+# Association files
+association/temp/
+associations/temp/
+
+# Mapping files
+mapping/temp/
+mappings/temp/
+
+# Binding files
+binding/temp/
+bindings/temp/
+
+# Attachment files
+attachment/temp/
+attachments/temp/
+
+# Dependency files
+dependency/temp/
+dependencies/temp/
+
+# Requirement files
+requirement/temp/
+requirements/temp/
+
+# Constraint files
+constraint/temp/
+constraints/temp/
+
+# Validation files
+validation/temp/
+validations/temp/
+
+# Verification files
+verification/temp/
+verifications/temp/
+
+# Authentication files
+authentication/temp/
+
+# Authorization files
+authorization/temp/
+
+# Security files
+security/temp/
+
+# Encryption files
+encryption/temp/
+
+# Decryption files
+decryption/temp/
+
+# Hashing files
+hashing/temp/
+
+# Signing files
+signing/temp/
+
+# Certificate files
+certificate/temp/
+certificates/temp/
+
+# Key files
+key/temp/
+keys/temp/
+
+# Token files
+token/temp/
+tokens/temp/
+
+# Session files
+session/temp/
+
+# Cookie files
+cookie/temp/
+cookies/temp/
+
+# Header files
+header/temp/
+headers/temp/
+
+# Footer files
+footer/temp/
+footers/temp/
+
+# Body files
+body/temp/
+bodies/temp/
+
+# Content files
+content/temp/
+contents/temp/
+
+# Payload files
+payload/temp/
+payloads/temp/
+
+# Data files
+data/temp/
+
+# Information files
+information/temp/
+
+# Detail files
+detail/temp/
+details/temp/
+
+# Summary files
+summary/temp/
+summaries/temp/
+
+# Overview files
+overview/temp/
+overviews/temp/
+
+# Description files
+description/temp/
+descriptions/temp/
+
+# Explanation files
+explanation/temp/
+explanations/temp/
+
+# Instruction files
+instruction/temp/
+instructions/temp/
+
+# Guide files
+guide/temp/
+guides/temp/
+
+# Manual files
+manual/temp/
+manuals/temp/
+
+# Handbook files
+handbook/temp/
+handbooks/temp/
+
+# Reference files
+reference/temp/
+
+# Glossary files
+glossary/temp/
+
+# Index files
+index/temp/
+indexes/temp/
+indices/temp/
+
+# Table files
+table/temp/
+tables/temp/
+
+# List files
+list/temp/
+lists/temp/
+
+# Array files
+array/temp/
+arrays/temp/
+
+# Collection files
+collection/temp/
+collections/temp/
+
+# Set files
+set/temp/
+sets/temp/
+
+# Map files
+map/temp/
+maps/temp/
+
+# Dictionary files
+dictionary/temp/
+dictionaries/temp/
+
+# Hash files
+hash/temp/
+hashes/temp/
+
+# Tree files
+tree/temp/
+trees/temp/
+
+# Graph files
+graph/temp/
+graphs/temp/
+
+# Node files
+node/temp/
+nodes/temp/
+
+# Edge files
+edge/temp/
+edges/temp/
+
+# Vertex files
+vertex/temp/
+vertices/temp/
+
+# Path files
+path/temp/
+paths/temp/
+
+# Route files
+route/temp/
+routes/temp/
+
+# URL files
+url/temp/
+urls/temp/
+
+# URI files
+uri/temp/
+uris/temp/
+
+# Endpoint files
+endpoint/temp/
+endpoints/temp/
+
+# API files
+api/temp/
+apis/temp/
+
+# Service files
+service/temp/
+
+# Client files
+client/temp/
+clients/temp/
+
+# Server files
+server/temp/
+servers/temp/
+
+# Host files
+host/temp/
+hosts/temp/
+
+# Port files
+port/temp/
+ports/temp/
+
+# Socket files
+socket/temp/
+sockets/temp/
+
+# Connection files
+connection/temp/
+
+# Network files
+network/temp/
+networks/temp/
+
+# Protocol files
+protocol/temp/
+
+# HTTP files
+http/temp/
+
+# HTTPS files
+https/temp/
+
+# TCP files
+tcp/temp/
+
+# UDP files
+udp/temp/
+
+# WebSocket files
+websocket/temp/
+websockets/temp/
+
+# gRPC files
+grpc/temp/
+
+# REST files
+rest/temp/
+
+# GraphQL files
+graphql/temp/
+
+# SOAP files
+soap/temp/
+
+# XML files
+xml/temp/
+
+# JSON files
+json/temp/
+
+# YAML files
+yaml/temp/
+
+# TOML files
+toml/temp/
+
+# INI files
+ini/temp/
+
+# Properties files
+properties/temp/
+
+# Environment files
+environment/temp/
+environments/temp/
+
+# Profile files
+profile/temp/
+profiles/temp/
+
+# Context files
+context/temp/
+contexts/temp/
+
+# Scope files
+scope/temp/
+scopes/temp/
+
+# Namespace files
+namespace/temp/
+namespaces/temp/
+
+# Package files
+package/temp/
+
+# Bundle files
+bundle/temp/
+bundles/temp/
+
+# Archive files
+archive/temp/
+
+# Backup files
+backup/temp/
+
+# Snapshot files
+snapshot/temp/
+snapshots/temp/
+
+# Checkpoint files
+checkpoint/temp/
+checkpoints/temp/
+
+# Savepoint files
+savepoint/temp/
+savepoints/temp/
+
+# Restore files
+restore/temp/
+restores/temp/
+
+# Recovery files
+recovery/temp/
+
+# Rollback files
+rollback/temp/
+rollbacks/temp/
+
+# Undo files
+undo/temp/
+
+# Redo files
+redo/temp/
+
+# History files
+history/temp/
+
+# Timeline files
+timeline/temp/
+timelines/temp/
+
+# Timestamp files
+timestamp/temp/
+timestamps/temp/
+
+# Date files
+date/temp/
+dates/temp/
+
+# Time files
+time/temp/
+times/temp/
+
+# Duration files
+duration/temp/
+durations/temp/
+
+# Period files
+period/temp/
+periods/temp/
+
+# Interval files
+interval/temp/
+intervals/temp/
+
+# Schedule files
+schedule/temp/
+schedules/temp/
+
+# Calendar files
+calendar/temp/
+calendars/temp/
+
+# Event files
+event/temp/
+
+# Task files
+task/temp/
+tasks/temp/
+
+# Job files
+job/temp/
+jobs/temp/
+
+# Work files
+work/temp/
+works/temp/
+
+# Process files
+process/temp/
+processes/temp/
+
+# Thread files
+thread/temp/
+threads/temp/
+
+# Routine files
+routine/temp/
+
+# Procedure files
+procedure/temp/
+
+# Function files
+function/temp/
+
+# Method files
+method/temp/
+
+# Operation files
+operation/temp/
+operations/temp/
+
+# Action files
+action/temp/
+actions/temp/
+
+# Activity files
+activity/temp/
+activities/temp/
+
+# Behavior files
+behavior/temp/
+behaviors/temp/
+behaviour/temp/
+behaviours/temp/
+
+# Pattern files
+pattern/temp/
+patterns/temp/
+
+# Template files
+template/temp/
+
+# Layout files
+layout/temp/
+layouts/temp/
+
+# Design files
+design/temp/
+designs/temp/
+
+# Style files
+style/temp/
+styles/temp/
+
+# Theme files
+theme/temp/
+themes/temp/
+
+# Skin files
+skin/temp/
+skins/temp/
+
+# Appearance files
+appearance/temp/
+
+# Look files
+look/temp/
+looks/temp/
+
+# Feel files
+feel/temp/
+feels/temp/
+
+# UI files
+ui/temp/
+
+# UX files
+ux/temp/
+
+# Interface files
+interface/temp/
+
+# View files
+view/temp/
+views/temp/
+
+# Page files
+page/temp/
+pages/temp/
+
+# Screen files
+screen/temp/
+screens/temp/
+
+# Window files
+window/temp/
+windows/temp/
+
+# Dialog files
+dialog/temp/
+dialogs/temp/
+
+# Modal files
+modal/temp/
+modals/temp/
+
+# Popup files
+popup/temp/
+popups/temp/
+
+# Tooltip files
+tooltip/temp/
+tooltips/temp/
+
+# Menu files
+menu/temp/
+menus/temp/
+
+# Navigation files
+navigation/temp/
+
+# Breadcrumb files
+breadcrumb/temp/
+breadcrumbs/temp/
+
+# Tab files
+tab/temp/
+tabs/temp/
+
+# Panel files
+panel/temp/
+panels/temp/
+
+# Section files
+section/temp/
+
+# Block files
+block/temp/
+blocks/temp/
+
+# Widget files
+widget/temp/
+widgets/temp/
+
+# Component files
+component/temp/
+
+# Control files
+control/temp/
+controls/temp/
+
+# Input files
+input/temp/
+inputs/temp/
+
+# Output files
+output/temp/
+outputs/temp/
+
+# Form files
+form/temp/
+forms/temp/
+
+# Field files
+field/temp/
+fields/temp/
+
+# Label files
+label/temp/
+labels/temp/
+
+# Button files
+button/temp/
+buttons/temp/
+
+# Link files
+link/temp/
+
+# Image files
+image/temp/
+
+# Icon files
+icon/temp/
+icons/temp/
+
+# Logo files
+logo/temp/
+logos/temp/
+
+# Banner files
+banner/temp/
+banners/temp/
+
+# Header files
+header/temp/
+
+# Footer files
+footer/temp/
+
+# Sidebar files
+sidebar/temp/
+sidebars/temp/
+
+# Content files
+content/temp/
+
+# Article files
+article/temp/
+articles/temp/
+
+# Post files
+post/temp/
+posts/temp/
+
+# Blog files
+blog/temp/
+blogs/temp/
+
+# News files
+news/temp/
+
+# Story files
+story/temp/
+stories/temp/
+
+# Text files
+text/temp/
+texts/temp/
+
+# Document files
+document/temp/
+documents/temp/
+
+# File files
+file/temp/
+files/temp/
+
+# Folder files
+folder/temp/
+folders/temp/
+
+# Directory files
+directory/temp/
+directories/temp/
+
+# Path files
+path/temp/
+
+# Location files
+location/temp/
+locations/temp/
+
+# Position files
+position/temp/
+positions/temp/
+
+# Coordinate files
+coordinate/temp/
+coordinates/temp/
+
+# Point files
+point/temp/
+points/temp/
+
+# Line files
+line/temp/
+lines/temp/
+
+# Shape files
+shape/temp/
+shapes/temp/
+
+# Rectangle files
+rectangle/temp/
+rectangles/temp/
+
+# Circle files
+circle/temp/
+circles/temp/
+
+# Triangle files
+triangle/temp/
+triangles/temp/
+
+# Polygon files
+polygon/temp/
+polygons/temp/
+
+# Curve files
+curve/temp/
+curves/temp/
+
+# Arc files
+arc/temp/
+arcs/temp/
+
+# Angle files
+angle/temp/
+angles/temp/
+
+# Dimension files
+dimension/temp/
+dimensions/temp/
+
+# Size files
+size/temp/
+sizes/temp/
+
+# Width files
+width/temp/
+widths/temp/
+
+# Height files
+height/temp/
+heights/temp/
+
+# Depth files
+depth/temp/
+depths/temp/
+
+# Length files
+length/temp/
+lengths/temp/
+
+# Distance files
+distance/temp/
+distances/temp/
+
+# Radius files
+radius/temp/
+
+# Diameter files
+diameter/temp/
+
+# Circumference files
+circumference/temp/
+
+# Area files
+area/temp/
+areas/temp/
+
+# Volume files
+volume/temp/
+volumes/temp/
+
+# Weight files
+weight/temp/
+weights/temp/
+
+# Mass files
+mass/temp/
+
+# Density files
+density/temp/
+
+# Pressure files
+pressure/temp/
+
+# Temperature files
+temperature/temp/
+temperatures/temp/
+
+# Humidity files
+humidity/temp/
+
+# Speed files
+speed/temp/
+speeds/temp/
+
+# Velocity files
+velocity/temp/
+velocities/temp/
+
+# Acceleration files
+acceleration/temp/
+accelerations/temp/
+
+# Force files
+force/temp/
+forces/temp/
+
+# Energy files
+energy/temp/
+
+# Power files
+power/temp/
+
+# Frequency files
+frequency/temp/
+frequencies/temp/
+
+# Amplitude files
+amplitude/temp/
+amplitudes/temp/
+
+# Phase files
+phase/temp/
+phases/temp/
+
+# Signal files
+signal/temp/
+signals/temp/
+
+# Wave files
+wave/temp/
+waves/temp/
+
+# Sound files
+sound/temp/
+sounds/temp/
+
+# Audio files
+audio/temp/
+
+# Music files
+music/temp/
+
+# Song files
+song/temp/
+songs/temp/
+
+# Track files
+track/temp/
+tracks/temp/
+
+# Album files
+album/temp/
+albums/temp/
+
+# Playlist files
+playlist/temp/
+playlists/temp/
+
+# Video files
+video/temp/
+
+# Movie files
+movie/temp/
+movies/temp/
+
+# Film files
+film/temp/
+films/temp/
+
+# Clip files
+clip/temp/
+clips/temp/
+
+# Frame files
+frame/temp/
+frames/temp/
+
+# Scene files
+scene/temp/
+scenes/temp/
+
+# Shot files
+shot/temp/
+shots/temp/
+
+# Take files
+take/temp/
+takes/temp/
+
+# Cut files
+cut/temp/
+cuts/temp/
+
+# Edit files
+edit/temp/
+edits/temp/
+
+# Render files
+render/temp/
+renders/temp/
+
+# Export files
+export/temp/
+
+# Import files
+import/temp/
+
+# Convert files
+convert/temp/
+converts/temp/
+
+# Transform files
+transform/temp/
+transforms/temp/
+
+# Process files
+process/temp/
+
+# Filter files
+filter/temp/
+
+# Effect files
+effect/temp/
+effects/temp/
+
+# Animation files
+animation/temp/
+animations/temp/
+
+# Transition files
+transition/temp/
+transitions/temp/
+
+# Motion files
+motion/temp/
+motions/temp/
+
+# Movement files
+movement/temp/
+movements/temp/
+
+# Gesture files
+gesture/temp/
+gestures/temp/
+
+# Touch files
+touch/temp/
+touches/temp/
+
+# Click files
+click/temp/
+clicks/temp/
+
+# Tap files
+tap/temp/
+taps/temp/
+
+# Swipe files
+swipe/temp/
+swipes/temp/
+
+# Drag files
+drag/temp/
+drags/temp/
+
+# Drop files
+drop/temp/
+drops/temp/
+
+# Scroll files
+scroll/temp/
+scrolls/temp/
+
+# Zoom files
+zoom/temp/
+zooms/temp/
+
+# Pan files
+pan/temp/
+pans/temp/
+
+# Rotate files
+rotate/temp/
+rotates/temp/
+
+# Scale files
+scale/temp/
+scales/temp/
+
+# Resize files
+resize/temp/
+resizes/temp/
+
+# Move files
+move/temp/
+moves/temp/
+
+# Copy files
+copy/temp/
+copies/temp/
+
+# Paste files
+paste/temp/
+pastes/temp/
+
+# Cut files
+cut/temp/
+
+# Delete files
+delete/temp/
+deletes/temp/
+
+# Remove files
+remove/temp/
+removes/temp/
+
+# Add files
+add/temp/
+adds/temp/
+
+# Insert files
+insert/temp/
+inserts/temp/
+
+# Update files
+update/temp/
+
+# Modify files
+modify/temp/
+modifies/temp/
+
+# Change files
+change/temp/
+
+# Replace files
+replace/temp/
+replaces/temp/
+
+# Substitute files
+substitute/temp/
+substitutes/temp/
+
+# Swap files
+swap/temp/
+swaps/temp/
+
+# Exchange files
+exchange/temp/
+exchanges/temp/
+
+# Trade files
+trade/temp/
+trades/temp/
+
+# Transfer files
+transfer/temp/
+transfers/temp/
+
+# Send files
+send/temp/
+sends/temp/
+
+# Receive files
+receive/temp/
+receives/temp/
+
+# Get files
+get/temp/
+gets/temp/
+
+# Put files
+put/temp/
+puts/temp/
+
+# Post files
+post/temp/
+
+# Patch files
+patch/temp/
+
+# Delete files
+delete/temp/
+
+# Head files
+head/temp/
+heads/temp/
+
+# Options files
+options/temp/
+
+# Trace files
+trace/temp/
+
+# Connect files
+connect/temp/
+connects/temp/
+
+# Disconnect files
+disconnect/temp/
+disconnects/temp/
+
+# Join files
+join/temp/
+joins/temp/
+
+# Leave files
+leave/temp/
+leaves/temp/
+
+# Enter files
+enter/temp/
+enters/temp/
+
+# Exit files
+exit/temp/
+exits/temp/
+
+# Start files
+start/temp/
+starts/temp/
+
+# Stop files
+stop/temp/
+stops/temp/
+
+# Pause files
+pause/temp/
+pauses/temp/
+
+# Resume files
+resume/temp/
+resumes/temp/
+
+# Continue files
+continue/temp/
+continues/temp/
+
+# Break files
+break/temp/
+breaks/temp/
+
+# Return files
+return/temp/
+returns/temp/
+
+# Yield files
+yield/temp/
+yields/temp/
+
+# Wait files
+wait/temp/
+waits/temp/
+
+# Sleep files
+sleep/temp/
+sleeps/temp/
+
+# Wake files
+wake/temp/
+wakes/temp/
+
+# Notify files
+notify/temp/
+notifies/temp/
+
+# Signal files
+signal/temp/
+
+# Trigger files
+trigger/temp/
+triggers/temp/
+
+# Fire files
+fire/temp/
+fires/temp/
+
+# Emit files
+emit/temp/
+emits/temp/
+
+# Broadcast files
+broadcast/temp/
+broadcasts/temp/
+
+# Publish files
+publish/temp/
+publishes/temp/
+
+# Subscribe files
+subscribe/temp/
+subscribes/temp/
+
+# Unsubscribe files
+unsubscribe/temp/
+unsubscribes/temp/
+
+# Listen files
+listen/temp/
+listens/temp/
+
+# Hear files
+hear/temp/
+hears/temp/
+
+# Watch files
+watch/temp/
+watches/temp/
+
+# See files
+see/temp/
+sees/temp/
+
+# Look files
+look/temp/
+
+# View files
+view/temp/
+
+# Show files
+show/temp/
+shows/temp/
+
+# Hide files
+hide/temp/
+hides/temp/
+
+# Display files
+display/temp/
+displays/temp/
+
+# Render files
+render/temp/
+
+# Draw files
+draw/temp/
+draws/temp/
+
+# Paint files
+paint/temp/
+paints/temp/
+
+# Fill files
+fill/temp/
+fills/temp/
+
+# Stroke files
+stroke/temp/
+strokes/temp/
+
+# Line files
+line/temp/
+
+# Curve files
+curve/temp/
+
+# Path files
+path/temp/
+
+# Shape files
+shape/temp/
+
+# Form files
+form/temp/
+
+# Structure files
+structure/temp/
+structures/temp/
+
+# Framework files
+framework/temp/
+
+# Architecture files
+architecture/temp/
+architectures/temp/
+
+# Design files
+design/temp/
+
+# Pattern files
+pattern/temp/
+
+# Model files
+model/temp/
+
+# Schema files
+schema/temp/
+
+# Blueprint files
+blueprint/temp/
+blueprints/temp/
+
+# Plan files
+plan/temp/
+plans/temp/
+
+# Strategy files
+strategy/temp/
+
+# Approach files
+approach/temp/
+approaches/temp/
+
+# Method files
+method/temp/
+
+# Technique files
+technique/temp/
+techniques/temp/
+
+# Procedure files
+procedure/temp/
+
+# Process files
+process/temp/
+
+# Workflow files
+workflow/temp/
+workflows/temp/
+
+# Pipeline files
+pipeline/temp/
+pipelines/temp/
+
+# Chain files
+chain/temp/
+chains/temp/
+
+# Sequence files
+sequence/temp/
+sequences/temp/
+
+# Series files
+series/temp/
+
+# Order files
+order/temp/
+orders/temp/
+
+# Sort files
+sort/temp/
+sorts/temp/
+
+# Rank files
+rank/temp/
+ranks/temp/
+
+# Priority files
+priority/temp/
+priorities/temp/
+
+# Level files
+level/temp/
+levels/temp/
+
+# Grade files
+grade/temp/
+grades/temp/
+
+# Score files
+score/temp/
+scores/temp/
+
+# Rating files
+rating/temp/
+ratings/temp/
+
+# Review files
+review/temp/
+
+# Feedback files
+feedback/temp/
+
+# Comment files
+comment/temp/
+
+# Note files
+note/temp/
+notes/temp/
+
+# Memo files
+memo/temp/
+memos/temp/
+
+# Message files
+message/temp/
+
+# Notification files
+notification/temp/
+
+# Alert files
+alert/temp/
+
+# Warning files
+warning/temp/
+
+# Error files
+error/temp/
+
+# Exception files
+exception/temp/
+
+# Fault files
+fault/temp/
+faults/temp/
+
+# Failure files
+failure/temp/
+failures/temp/
+
+# Problem files
+problem/temp/
+problems/temp/
+
+# Issue files
+issue/temp/
+
+# Bug files
+bug/temp/
+
+# Defect files
+defect/temp/
+defects/temp/
+
+# Flaw files
+flaw/temp/
+flaws/temp/
+
+# Weakness files
+weakness/temp/
+weaknesses/temp/
+
+# Vulnerability files
+vulnerability/temp/
+vulnerabilities/temp/
+
+# Risk files
+risk/temp/
+risks/temp/
+
+# Threat files
+threat/temp/
+threats/temp/
+
+# Danger files
+danger/temp/
+dangers/temp/
+
+# Hazard files
+hazard/temp/
+hazards/temp/
+
+# Safety files
+safety/temp/
+
+# Security files
+security/temp/
+
+# Protection files
+protection/temp/
+protections/temp/
+
+# Defense files
+defense/temp/
+defenses/temp/
+defence/temp/
+defences/temp/
+
+# Guard files
+guard/temp/
+
+# Shield files
+shield/temp/
+shields/temp/
+
+# Barrier files
+barrier/temp/
+barriers/temp/
+
+# Wall files
+wall/temp/
+walls/temp/
+
+# Fence files
+fence/temp/
+fences/temp/
+
+# Gate files
+gate/temp/
+gates/temp/
+
+# Door files
+door/temp/
+doors/temp/
+
+# Window files
+window/temp/
+
+# Opening files
+opening/temp/
+openings/temp/
+
+# Entrance files
+entrance/temp/
+entrances/temp/
+
+# Exit files
+exit/temp/
+
+# Access files
+access/temp/
+accesses/temp/
+
+# Entry files
+entry/temp/
+entries/temp/
+
+# Login files
+login/temp/
+logins/temp/
+
+# Logout files
+logout/temp/
+logouts/temp/
+
+# Signin files
+signin/temp/
+signins/temp/
+
+# Signout files
+signout/temp/
+signouts/temp/
+
+# Register files
+register/temp/
+registers/temp/
+
+# Registration files
+registration/temp/
+registrations/temp/
+
+# Account files
+account/temp/
+accounts/temp/
+
+# Profile files
+profile/temp/
+
+# User files
+user/temp/
+
+# Member files
+member/temp/
+members/temp/
+
+# Guest files
+guest/temp/
+guests/temp/
+
+# Visitor files
+visitor/temp/
+visitors/temp/
+
+# Customer files
+customer/temp/
+customers/temp/
+
+# Client files
+client/temp/
+
+# Subscriber files
+subscriber/temp/
+subscribers/temp/
+
+# Follower files
+follower/temp/
+followers/temp/
+
+# Friend files
+friend/temp/
+friends/temp/
+
+# Contact files
+contact/temp/
+contacts/temp/
+
+# Person files
+person/temp/
+persons/temp/
+people/temp/
+
+# Individual files
+individual/temp/
+individuals/temp/
+
+# Entity files
+entity/temp/
+
+# Object files
+object/temp/
+
+# Item files
+item/temp/
+
+# Element files
+element/temp/
+
+# Component files
+component/temp/
+
+# Part files
+part/temp/
+parts/temp/
+
+# Piece files
+piece/temp/
+pieces/temp/
+
+# Fragment files
+fragment/temp/
+fragments/temp/
+
+# Segment files
+segment/temp/
+segments/temp/
+
+# Section files
+section/temp/
+
+# Division files
+division/temp/
+
+# Portion files
+portion/temp/
+portions/temp/
+
+# Share files
+share/temp/
+shares/temp/
+
+# Fraction files
+fraction/temp/
+fractions/temp/
+
+# Percentage files
+percentage/temp/
+percentages/temp/
+
+# Ratio files
+ratio/temp/
+ratios/temp/
+
+# Proportion files
+proportion/temp/
+proportions/temp/
+
+# Rate files
+rate/temp/
+rates/temp/
+
+# Speed files
+speed/temp/
+
+# Pace files
+pace/temp/
+paces/temp/
+
+# Rhythm files
+rhythm/temp/
+rhythms/temp/
+
+# Beat files
+beat/temp/
+beats/temp/
+
+# Pulse files
+pulse/temp/
+pulses/temp/
+
+# Heartbeat files
+heartbeat/temp/
+heartbeats/temp/
+
+# Cycle files
+cycle/temp/
+cycles/temp/
+
+# Loop files
+loop/temp/
+loops/temp/
+
+# Iteration files
+iteration/temp/
+iterations/temp/
+
+# Repetition files
+repetition/temp/
+repetitions/temp/
+
+# Recurrence files
+recurrence/temp/
+recurrences/temp/
+
+# Pattern files
+pattern/temp/
+
+# Trend files
+trend/temp/
+trends/temp/
+
+# Direction files
+direction/temp/
+directions/temp/
+
+# Orientation files
+orientation/temp/
+orientations/temp/
+
+# Alignment files
+alignment/temp/
+alignments/temp/
+
+# Position files
+position/temp/
+
+# Location files
+location/temp/
+
+# Place files
+place/temp/
+places/temp/
+
+# Site files
+site/temp/
+sites/temp/
+
+# Spot files
+spot/temp/
+spots/temp/
+
+# Point files
+point/temp/
+
+# Coordinate files
+coordinate/temp/
+
+# Address files
+address/temp/
+addresses/temp/
+
+# Destination files
+destination/temp/
+destinations/temp/
+
+# Target files
+target/temp/
+targets/temp/
+
+# Goal files
+goal/temp/
+goals/temp/
+
+# Objective files
+objective/temp/
+objectives/temp/
+
+# Purpose files
+purpose/temp/
+purposes/temp/
+
+# Intention files
+intention/temp/
+intentions/temp/
+
+# Plan files
+plan/temp/
+
+# Strategy files
+strategy/temp/
+
+# Tactic files
+tactic/temp/
+tactics/temp/
+
+# Approach files
+approach/temp/
+
+# Method files
+method/temp/
+
+# Way files
+way/temp/
+ways/temp/
+
+# Manner files
+manner/temp/
+manners/temp/
+
+# Style files
+style/temp/
+
+# Fashion files
+fashion/temp/
+fashions/temp/
+
+# Mode files
+mode/temp/
+modes/temp/
+
+# Type files
+type/temp/
+
+# Kind files
+kind/temp/
+kinds/temp/
+
+# Sort files
+sort/temp/
+
+# Category files
+category/temp/
+categories/temp/
+
+# Class files
+class/temp/
+
+# Group files
+group/temp/
+
+# Set files
+set/temp/
+
+# Collection files
+collection/temp/
+
+# Batch files
+batch/temp/
+batches/temp/
+
+# Bundle files
+bundle/temp/
+
+# Package files
+package/temp/
+
+# Container files
+container/temp/
+containers/temp/
+
+# Box files
+box/temp/
+boxes/temp/
+
+# Bag files
+bag/temp/
+bags/temp/
+
+# Sack files
+sack/temp/
+sacks/temp/
+
+# Pouch files
+pouch/temp/
+pouches/temp/
+
+# Pocket files
+pocket/temp/
+pockets/temp/
+
+# Wallet files
+wallet/temp/
+wallets/temp/
+
+# Purse files
+purse/temp/
+purses/temp/
+
+# Case files
+case/temp/
+cases/temp/
+
+# Cover files
+cover/temp/
+covers/temp/
+
+# Wrapper files
+wrapper/temp/
+wrappers/temp/
+
+# Envelope files
+envelope/temp/
+envelopes/temp/
+
+# Package files
+package/temp/
+
+# Parcel files
+parcel/temp/
+parcels/temp/
+
+# Shipment files
+shipment/temp/
+shipments/temp/
+
+# Delivery files
+delivery/temp/
+deliveries/temp/
+
+# Order files
+order/temp/
+
+# Purchase files
+purchase/temp/
+purchases/temp/
+
+# Sale files
+sale/temp/
+sales/temp/
+
+# Transaction files
+transaction/temp/
+transactions/temp/
+
+# Payment files
+payment/temp/
+payments/temp/
+
+# Invoice files
+invoice/temp/
+invoices/temp/
+
+# Receipt files
+receipt/temp/
+receipts/temp/
+
+# Bill files
+bill/temp/
+bills/temp/
+
+# Statement files
+statement/temp/
+statements/temp/
+
+# Report files
+report/temp/
+reports/temp/
+
+# Summary files
+summary/temp/
+
+# Overview files
+overview/temp/
+
+# Analysis files
+analysis/temp/
+analyses/temp/
+
+# Study files
+study/temp/
+studies/temp/
+
+# Research files
+research/temp/
+
+# Investigation files
+investigation/temp/
+investigations/temp/
+
+# Examination files
+examination/temp/
+examinations/temp/
+
+# Inspection files
+inspection/temp/
+inspections/temp/
+
+# Audit files
+audit/temp/
+
+# Review files
+review/temp/
+
+# Assessment files
+assessment/temp/
+assessments/temp/
+
+# Evaluation files
+evaluation/temp

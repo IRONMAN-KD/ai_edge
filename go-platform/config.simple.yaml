@@ -1,0 +1,61 @@
+# 简化配置文件用于本地开发
+server:
+  host: "0.0.0.0"
+  port: 5001
+  mode: "debug"
+
+database:
+  host: "localhost"
+  port: 3306
+  username: "root"
+  password: "password"
+  database: "ai_edge"
+  charset: "utf8mb4"
+  parse_time: true
+  loc: "Local"
+  max_idle_conns: 10
+  max_open_conns: 100
+  conn_max_lifetime: 3600
+
+redis:
+  host: "localhost"
+  port: 6379
+  password: ""
+  db: 0
+  pool_size: 10
+  min_idle_conns: 5
+
+jwt:
+  secret: "your-secret-key-here"
+  expires_in: 86400
+  issuer: "ai-edge-platform"
+
+logging:
+  level: "debug"
+  format: "json"
+  output: "stdout"
+  file_path: "logs/app.log"
+  max_size: 100
+  max_backups: 3
+  max_age: 28
+  compress: true
+
+health:
+  check_path: "/health"
+
+security:
+  cors:
+    enabled: true
+    allowed_origins: ["http://localhost:5173", "http://127.0.0.1:5173"]
+    allowed_methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+    allowed_headers: ["*"]
+    allow_credentials: true
+  rate_limit:
+    enabled: true
+    requests_per_minute: 100
+
+development:
+  auto_migrate: true
+  seed_data: true
+  debug_sql: false
+  mock_inference: true

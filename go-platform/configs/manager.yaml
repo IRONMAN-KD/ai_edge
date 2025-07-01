@@ -1,0 +1,799 @@
+# AI Edge Platform Manager Configuration
+
+# 管理器配置
+manager:
+  enabled: true
+  graceful_timeout: 30s
+  shutdown_timeout: 60s
+
+  # 任务调度器配置
+  task_scheduler:
+    enabled: true
+    worker_pool_size: 10
+    queue_size: 1000
+    task_timeout: 5m
+    max_retries: 3
+    retry_delay: 30s
+    cleanup_interval: 1h
+    metrics_interval: 30s
+    persist_tasks: true
+    task_retention: 24h
+    concurrency_limit: 20
+    priority_enabled: true
+    dead_letter_queue: true
+    
+    # 批处理配置
+    batch_processing:
+      enabled: true
+      size: 100
+      timeout: 30s
+      max_wait: 5s
+      concurrency: 5
+    
+    # 调度模式
+    schedule_patterns:
+      - "0 */5 * * * *"  # 每5分钟
+      - "0 0 */1 * * *"  # 每小时
+      - "0 0 0 */1 * *"  # 每天
+
+  # 监控配置
+  monitor:
+    enabled: true
+    interval: 30s
+    metrics_retention: 7d
+    
+    # 系统指标
+    system_metrics:
+      enabled: true
+      cpu: true
+      memory: true
+      disk: true
+      network: true
+      process: true
+      goroutines: true
+      gc: true
+      interfaces:
+        - "eth0"
+        - "lo"
+      mount_points:
+        - "/"
+        - "/var"
+        - "/tmp"
+    
+    # 应用指标
+    application_metrics:
+      enabled: true
+      http: true
+      grpc: true
+      database: true
+      cache: true
+      queue: true
+      custom: true
+      endpoints:
+        - "/api/v1/health"
+        - "/api/v1/metrics"
+      exclude_patterns:
+        - "/debug/*"
+        - "/internal/*"
+    
+    # 数据库指标
+    database_metrics:
+      enabled: true
+      connections: true
+      queries: true
+      slow_queries: true
+      deadlocks: true
+      table_sizes: true
+      index_usage: true
+      replication: false
+      tables:
+        - "users"
+        - "models"
+        - "tasks"
+        - "inference_records"
+        - "alerts"
+      slow_query_threshold: 1s
+    
+    # Redis指标
+    redis_metrics:
+      enabled: true
+      connections: true
+      memory: true
+      keys: true
+      commands: true
+      replication: false
+      persistence: true
+      cluster: false
+      key_patterns:
+        - "ai_edge:*"
+        - "cache:*"
+        - "session:*"
+      databases:
+        - 0
+        - 1
+    
+    # 模型指标
+    model_metrics:
+      enabled: true
+      inferences: true
+      latency: true
+      accuracy: true
+      throughput: true
+      errors: true
+      resource_usage: true
+      model_versions: true
+      models:
+        - "yolo"
+        - "bert"
+        - "resnet"
+      metric_types:
+        - "inference_count"
+        - "inference_latency"
+        - "inference_accuracy"
+        - "model_load_time"
+    
+    # 自定义指标
+    custom_metrics:
+      - name: "business_metric_1"
+        type: "gauge"
+        description: "Business specific metric"
+        labels:
+          - "service"
+          - "environment"
+        query: "SELECT COUNT(*) FROM custom_table"
+        interval: 1m
+        timeout: 10s
+        enabled: true
+        parameters:
+          table: "custom_table"
+          condition: "status = 'active'"
+    
+    # 告警阈值
+    thresholds:
+      cpu_usage: 80.0
+      memory_usage: 85.0
+      disk_usage: 90.0
+      network_usage: 80.0
+      response_time: 1000.0
+      error_rate: 5.0
+      queue_length: 1000.0
+      connection_count: 100.0
+    
+    # 聚合配置
+    aggregation:
+      enabled: true
+      interval: 1m
+      retention: 30d
+      functions:
+        - "avg"
+        - "max"
+        - "min"
+        - "sum"
+        - "count"
+      group_by:
+        - "instance"
+        - "service"
+      downsampling:
+        "1h": 1d
+        "1d": 30d
+        "1w": 1y
+    
+    # 导出配置
+    export:
+      enabled: true
+      prometheus:
+        enabled: true
+        endpoint: "http://localhost:9090"
+        namespace: "ai_edge"
+        labels:
+          environment: "production"
+          service: "manager"
+        timeout: 30s
+      influxdb:
+        enabled: false
+        url: "http://localhost:8086"
+        database: "ai_edge"
+        username: "admin"
+        password: "password"
+        retention: "30d"
+        precision: "s"
+        timeout: 30s
+        batch_size: 1000
+      elasticsearch:
+        enabled: false
+        urls:
+          - "http://localhost:9200"
+        index: "ai-edge-metrics"
+        username: "elastic"
+        password: "password"
+        timeout: 30s
+        batch_size: 1000
+        flush_interval: 10s
+    
+    # 存储配置
+    storage:
+      type: "file"
+      path: "/var/lib/ai-edge/metrics"
+      retention: 30d
+      compression: true
+      encryption: false
+      backup:
+        enabled: true
+        interval: 24h
+        retention: 7d
+        path: "/var/lib/ai-edge/backups/metrics"
+        compression: true
+        encryption: false
+
+  # 告警管理器配置
+  alert_manager:
+    enabled: true
+    rules_file: "/etc/ai-edge/alert-rules.yaml"
+    rules_reload_interval: 5m
+    evaluation_interval: 30s
+    alert_retention: 7d
+    cooldown_period: 5m
+    
+    # 分组配置
+    grouping:
+      enabled: true
+      by:
+        - "alertname"
+        - "instance"
+        - "severity"
+      wait: 10s
+      interval: 5m
+      repeat_interval: 12h
+    
+    # 抑制配置
+    suppression:
+      enabled: true
+      default_ttl: 1h
+      max_ttl: 24h
+      rules:
+        - name: "maintenance_window"
+          matchers:
+            environment: "production"
+            maintenance: "true"
+          ttl: 4h
+          enabled: true
+    
+    # 通知器配置
+    notifiers:
+      console:
+        type: "console"
+        enabled: true
+        timeout: 5s
+        retries: 3
+        retry_delay: 1s
+        template: "default"
+      
+      email:
+        type: "email"
+        enabled: false
+        timeout: 30s
+        retries: 3
+        retry_delay: 5s
+        settings:
+          smtp_host: "smtp.gmail.com"
+          smtp_port: 587
+          username: "alerts@company.com"
+          password: "password"
+          from: "AI Edge Platform <alerts@company.com>"
+          to:
+            - "admin@company.com"
+            - "ops@company.com"
+        rate_limit:
+          enabled: true
+          rate: 10
+          burst: 20
+          window: 1m
+        filters:
+          - type: "severity"
+            parameters:
+              min_level: "warning"
+            enabled: true
+        template: "email"
+      
+      webhook:
+        type: "webhook"
+        enabled: false
+        timeout: 30s
+        retries: 3
+        retry_delay: 5s
+        settings:
+          url: "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
+          method: "POST"
+          headers:
+            Content-Type: "application/json"
+            Authorization: "Bearer YOUR_TOKEN"
+        template: "webhook"
+      
+      slack:
+        type: "slack"
+        enabled: false
+        timeout: 30s
+        retries: 3
+        retry_delay: 5s
+        settings:
+          webhook_url: "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
+          channel: "#alerts"
+          username: "AI Edge Bot"
+          icon_emoji: ":robot_face:"
+        template: "slack"
+      
+      dingtalk:
+        type: "dingtalk"
+        enabled: false
+        timeout: 30s
+        retries: 3
+        retry_delay: 5s
+        settings:
+          webhook_url: "https://oapi.dingtalk.com/robot/send?access_token=YOUR_TOKEN"
+          secret: "YOUR_SECRET"
+        template: "dingtalk"
+    
+    # 路由配置
+    routing:
+      enabled: true
+      default:
+        - "console"
+      fallback:
+        - "console"
+      rules:
+        - name: "critical_alerts"
+          matchers:
+            severity: "critical"
+          notifiers:
+            - "email"
+            - "slack"
+            - "dingtalk"
+          continue: false
+          enabled: true
+        - name: "warning_alerts"
+          matchers:
+            severity: "warning"
+          notifiers:
+            - "slack"
+          continue: true
+          enabled: true
+    
+    # 模板配置
+    templates:
+      enabled: true
+      path: "/etc/ai-edge/templates"
+      reload: true
+      templates:
+        default: |
+          Alert: {{ .AlertName }}
+          Severity: {{ .Severity }}
+          Instance: {{ .Instance }}
+          Description: {{ .Description }}
+          Time: {{ .Time }}
+        email: |
+          Subject: [AI Edge] {{ .Severity | upper }} - {{ .AlertName }}
+          
+          Alert Details:
+          - Name: {{ .AlertName }}
+          - Severity: {{ .Severity }}
+          - Instance: {{ .Instance }}
+          - Description: {{ .Description }}
+          - Time: {{ .Time }}
+          - Labels: {{ range $k, $v := .Labels }}{{ $k }}={{ $v }} {{ end }}
+        slack: |
+          {
+            "text": "{{ .Severity | upper }} Alert: {{ .AlertName }}",
+            "attachments": [
+              {
+                "color": "{{ if eq .Severity \"critical\" }}danger{{ else if eq .Severity \"warning\" }}warning{{ else }}good{{ end }}",
+                "fields": [
+                  {
+                    "title": "Instance",
+                    "value": "{{ .Instance }}",
+                    "short": true
+                  },
+                  {
+                    "title": "Description",
+                    "value": "{{ .Description }}",
+                    "short": false
+                  }
+                ],
+                "ts": {{ .Timestamp }}
+              }
+            ]
+          }
+        webhook: |
+          {
+            "alert_name": "{{ .AlertName }}",
+            "severity": "{{ .Severity }}",
+            "instance": "{{ .Instance }}",
+            "description": "{{ .Description }}",
+            "timestamp": {{ .Timestamp }},
+            "labels": {{ .Labels | toJson }}
+          }
+        dingtalk: |
+          {
+            "msgtype": "markdown",
+            "markdown": {
+              "title": "{{ .Severity | upper }} Alert",
+              "text": "## {{ .Severity | upper }} Alert: {{ .AlertName }}\n\n**Instance:** {{ .Instance }}\n\n**Description:** {{ .Description }}\n\n**Time:** {{ .Time }}"
+            }
+          }
+      functions:
+        - "upper"
+        - "lower"
+        - "title"
+        - "toJson"
+    
+    # Webhook配置
+    webhooks:
+      - name: "external_system"
+        url: "https://external-system.com/api/alerts"
+        method: "POST"
+        headers:
+          Content-Type: "application/json"
+          X-API-Key: "your-api-key"
+        timeout: 30s
+        retries: 3
+        enabled: false
+        tls:
+          enabled: true
+          cert_file: "/etc/ssl/certs/client.crt"
+          key_file: "/etc/ssl/private/client.key"
+          ca_file: "/etc/ssl/certs/ca.crt"
+          insecure: false
+        auth:
+          type: "bearer"
+          enabled: true
+          parameters:
+            token: "your-bearer-token"
+    
+    # 升级配置
+    escalation:
+      enabled: true
+      max_level: 3
+      cooldown: 1h
+      levels:
+        - level: 1
+          delay: 5m
+          notifiers:
+            - "slack"
+          conditions:
+            - "severity == 'warning'"
+          enabled: true
+        - level: 2
+          delay: 15m
+          notifiers:
+            - "email"
+            - "slack"
+          conditions:
+            - "severity == 'critical'"
+          enabled: true
+        - level: 3
+          delay: 30m
+          notifiers:
+            - "email"
+            - "slack"
+            - "dingtalk"
+          conditions:
+            - "severity == 'critical'"
+            - "duration > '30m'"
+          enabled: true
+
+  # 健康检查器配置
+  health_checker:
+    enabled: true
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    failure_threshold: 3
+    success_threshold: 1
+    
+    # 检查项配置
+    checks:
+      database:
+        type: "database"
+        enabled: true
+        interval: 30s
+        timeout: 5s
+        retries: 3
+        parameters:
+          query: "SELECT 1"
+        thresholds:
+          response_time: 1000.0
+      
+      redis:
+        type: "redis"
+        enabled: true
+        interval: 30s
+        timeout: 5s
+        retries: 3
+        parameters:
+          command: "PING"
+        thresholds:
+          response_time: 100.0
+      
+      grpc:
+        type: "grpc"
+        enabled: true
+        interval: 60s
+        timeout: 10s
+        retries: 3
+        parameters:
+          address: "localhost:50051"
+          service: "ai.edge.v1.InferenceService"
+        thresholds:
+          response_time: 2000.0
+      
+      disk_space:
+        type: "disk"
+        enabled: true
+        interval: 5m
+        timeout: 10s
+        retries: 1
+        parameters:
+          path: "/"
+        thresholds:
+          usage_percent: 90.0
+      
+      memory:
+        type: "memory"
+        enabled: true
+        interval: 1m
+        timeout: 5s
+        retries: 1
+        thresholds:
+          usage_percent: 90.0
+    
+    # 端点检查
+    endpoints:
+      - name: "api_health"
+        url: "http://localhost:8080/api/v1/health"
+        method: "GET"
+        headers:
+          User-Agent: "AI-Edge-HealthChecker/1.0"
+        expected_status:
+          - 200
+        expected_body: "OK"
+        timeout: 10s
+        enabled: true
+      
+      - name: "metrics_endpoint"
+        url: "http://localhost:9090/metrics"
+        method: "GET"
+        expected_status:
+          - 200
+        timeout: 10s
+        enabled: true
+    
+    # 依赖检查
+    dependencies:
+      - name: "external_api"
+        type: "http"
+        address: "https://api.external-service.com/health"
+        timeout: 30s
+        critical: false
+        enabled: true
+      
+      - name: "message_queue"
+        type: "tcp"
+        address: "localhost:5672"
+        timeout: 10s
+        critical: true
+        enabled: false
+    
+    # 通知配置
+    notifications:
+      enabled: true
+      channels:
+        - "console"
+        - "slack"
+      on_failure: true
+      on_recovery: true
+      on_degraded: true
+    
+    # 恢复配置
+    recovery:
+      enabled: true
+      actions:
+        - "restart_service"
+        - "clear_cache"
+        - "notify_admin"
+      timeout: 5m
+      retries: 3
+      cooldown: 10m
+
+  # 指标配置
+  metrics:
+    enabled: true
+    path: "/metrics"
+    port: 9090
+    interval: 30s
+    retention: 7d
+    namespace: "ai_edge"
+    subsystem: "manager"
+    labels:
+      service: "manager"
+      version: "1.0.0"
+      environment: "production"
+
+  # 日志配置
+  logging:
+    level: "info"
+    format: "json"
+    output: "stdout"
+    file: "/var/log/ai-edge/manager.log"
+    max_size: 100
+    max_backups: 10
+    max_age: 30
+    compress: true
+    structured: true
+    rotation:
+      enabled: true
+      max_size: 100
+      max_age: 720h
+      max_backups: 10
+      compress: true
+    sampling:
+      enabled: false
+      initial: 100
+      thereafter: 100
+      tick: 1s
+
+  # 安全配置
+  security:
+    enabled: true
+    authentication:
+      type: "jwt"
+      enabled: false
+      parameters:
+        secret: "your-jwt-secret"
+        expiry: "24h"
+    authorization:
+      enabled: false
+      provider: "rbac"
+      default: "deny"
+      rules:
+        - resource: "/api/v1/manager/*"
+          actions:
+            - "read"
+            - "write"
+          subjects:
+            - "admin"
+            - "operator"
+          effect: "allow"
+    encryption:
+      enabled: false
+      algorithm: "AES-256-GCM"
+      key_file: "/etc/ai-edge/encryption.key"
+      key_size: 256
+    tls:
+      enabled: false
+      cert_file: "/etc/ssl/certs/server.crt"
+      key_file: "/etc/ssl/private/server.key"
+      ca_file: "/etc/ssl/certs/ca.crt"
+      insecure: false
+    rate_limit:
+      enabled: true
+      rate: 100
+      burst: 200
+      window: 1m
+      strategy: "sliding_window"
+    audit:
+      enabled: true
+      level: "info"
+      output: "file"
+      retention: 90d
+      format: "json"
+    firewall:
+      enabled: false
+      whitelist:
+        - "127.0.0.1"
+        - "10.0.0.0/8"
+        - "172.16.0.0/12"
+        - "192.168.0.0/16"
+      blacklist: []
+      rules: []
+    secrets:
+      provider: "file"
+      path: "/etc/ai-edge/secrets"
+      encryption: true
+      rotation: false
+      parameters:
+        key_file: "/etc/ai-edge/master.key"
+
+  # 性能配置
+  performance:
+    enabled: true
+    profiling:
+      enabled: false
+      cpu: true
+      memory: true
+      goroutine: true
+      block: false
+      mutex: false
+      trace: false
+      port: 6060
+      path: "/debug/pprof"
+    caching:
+      enabled: true
+      provider: "memory"
+      size: 1000
+      ttl: 1h
+      eviction: "lru"
+      compression: false
+    compression:
+      enabled: true
+      algorithm: "gzip"
+      level: 6
+      threshold: 1024
+    connection_pool:
+      max_size: 100
+      min_size: 10
+      max_idle: 50
+      idle_timeout: 30m
+      max_lifetime: 1h
+    optimizations:
+      enable_pipelining: true
+      enable_multiplexing: true
+      enable_compression: true
+      enable_keep_alive: true
+    limits:
+      max_memory: 1073741824  # 1GB
+      max_cpu: 2.0
+      max_connections: 1000
+      max_requests: 10000
+      max_file_size: 104857600  # 100MB
+      max_request_size: 10485760  # 10MB
+      max_response_size: 104857600  # 100MB
+      timeout: 30s
+    tuning:
+      gc_percent: 100
+      max_procs: 0  # Use all available CPUs
+      read_buffer_size: 4096
+      write_buffer_size: 4096
+      keep_alive: 30s
+      idle_timeout: 60s
+
+  # 功能开关
+  features:
+    task_scheduling: true
+    monitoring: true
+    alerting: true
+    health_check: true
+    metrics: true
+    logging: true
+    security: true
+    performance: true
+    profiling: false
+    debugging: false
+    experimental: false
+
+  # 扩展配置
+  extensions:
+    plugins:
+      enabled: false
+      path: "/etc/ai-edge/plugins"
+      auto_load: false
+    integrations:
+      kubernetes:
+        enabled: false
+        namespace: "ai-edge"
+        config_path: "/etc/kubernetes/config"
+      docker:
+        enabled: true
+        socket: "/var/run/docker.sock"
+      prometheus:
+        enabled: true
+        url: "http://localhost:9090"
+      grafana:
+        enabled: false
+        url: "http://localhost:3000"
+        api_key: "your-grafana-api-key"
+    custom:
+      business_rules:
+        enabled: false
+        config_file: "/etc/ai-edge/business-rules.yaml"
+      data_pipeline:
+        enabled: false
+        config_file: "/etc/ai-edge/data-pipeline.yaml"

@@ -1,0 +1,156 @@
+syntax = "proto3";
+
+package inference;
+
+option go_package = "ai-edge/go-platform/api/proto/inference";
+
+// 推理服务定义
+service InferenceService {
+  // 执行推理
+  rpc ExecuteInference(InferenceRequest) returns (InferenceResponse);
+  
+  // 批量推理
+  rpc BatchInference(BatchInferenceRequest) returns (BatchInferenceResponse);
+  
+  // 获取模型状态
+  rpc GetModelStatus(ModelStatusRequest) returns (ModelStatusResponse);
+  
+  // 加载模型
+  rpc LoadModel(LoadModelRequest) returns (LoadModelResponse);
+  
+  // 卸载模型
+  rpc UnloadModel(UnloadModelRequest) returns (UnloadModelResponse);
+  
+  // 健康检查
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+}
+
+// 推理请求
+message InferenceRequest {
+  string task_id = 1;           // 任务ID
+  string model_name = 2;        // 模型名称
+  string model_version = 3;     // 模型版本
+  bytes input_data = 4;         // 输入数据（图像、视频等）
+  map<string, string> parameters = 5; // 推理参数
+  string request_id = 6;        // 请求ID
+}
+
+// 推理响应
+message InferenceResponse {
+  string request_id = 1;        // 请求ID
+  bool success = 2;             // 是否成功
+  string error_message = 3;     // 错误信息
+  repeated Detection detections = 4; // 检测结果
+  double confidence = 5;        // 置信度
+  double process_time = 6;      // 处理时间（秒）
+  map<string, string> metadata = 7; // 元数据
+}
+
+// 检测结果
+message Detection {
+  string class_name = 1;        // 类别名称
+  double confidence = 2;        // 置信度
+  BoundingBox bbox = 3;         // 边界框
+  map<string, string> attributes = 4; // 属性
+}
+
+// 边界框
+message BoundingBox {
+  double x = 1;                 // x坐标
+  double y = 2;                 // y坐标
+  double width = 3;             // 宽度
+  double height = 4;            // 高度
+}
+
+// 批量推理请求
+message BatchInferenceRequest {
+  repeated InferenceRequest requests = 1; // 推理请求列表
+}
+
+// 批量推理响应
+message BatchInferenceResponse {
+  repeated InferenceResponse responses = 1; // 推理响应列表
+}
+
+// 模型状态请求
+message ModelStatusRequest {
+  string model_name = 1;        // 模型名称
+  string model_version = 2;     // 模型版本
+}
+
+// 模型状态响应
+message ModelStatusResponse {
+  string model_name = 1;        // 模型名称
+  string model_version = 2;     // 模型版本
+  ModelState state = 3;         // 模型状态
+  string error_message = 4;     // 错误信息
+  int64 load_time = 5;          // 加载时间
+  int64 last_used = 6;          // 最后使用时间
+  ModelMetrics metrics = 7;     // 模型指标
+}
+
+// 模型状态枚举
+enum ModelState {
+  MODEL_UNKNOWN = 0;
+  MODEL_LOADING = 1;
+  MODEL_READY = 2;
+  MODEL_ERROR = 3;
+  MODEL_UNLOADING = 4;
+}
+
+// 模型指标
+message ModelMetrics {
+  int64 total_requests = 1;     // 总请求数
+  int64 successful_requests = 2; // 成功请求数
+  int64 failed_requests = 3;    // 失败请求数
+  double average_latency = 4;   // 平均延迟
+  double memory_usage = 5;      // 内存使用量（MB）
+  double gpu_usage = 6;         // GPU使用率
+}
+
+// 加载模型请求
+message LoadModelRequest {
+  string model_name = 1;        // 模型名称
+  string model_version = 2;     // 模型版本
+  string model_path = 3;        // 模型路径
+  map<string, string> config = 4; // 配置参数
+}
+
+// 加载模型响应
+message LoadModelResponse {
+  bool success = 1;             // 是否成功
+  string error_message = 2;     // 错误信息
+  int64 load_time = 3;          // 加载时间（毫秒）
+}
+
+// 卸载模型请求
+message UnloadModelRequest {
+  string model_name = 1;        // 模型名称
+  string model_version = 2;     // 模型版本
+}
+
+// 卸载模型响应
+message UnloadModelResponse {
+  bool success = 1;             // 是否成功
+  string error_message = 2;     // 错误信息
+}
+
+// 健康检查请求
+message HealthCheckRequest {
+  string service = 1;           // 服务名称
+}
+
+// 健康检查响应
+message HealthCheckResponse {
+  HealthStatus status = 1;      // 健康状态
+  string message = 2;           // 状态信息
+  map<string, string> details = 3; // 详细信息
+}
+
+// 健康状态枚举
+enum HealthStatus {
+  HEALTH_UNKNOWN = 0;
+  HEALTH_SERVING = 1;
+  HEALTH_NOT_SERVING = 2;
+  HEALTH_SERVICE_UNKNOWN = 3;
+}

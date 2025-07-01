@@ -1,0 +1,146 @@
+version: '3.8'
+
+services:
+  # Go Platform 应用服务
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: go-platform-app
+    ports:
+      - "8080:8080"
+    environment:
+      - SERVER_PORT=8080
+      - SERVER_MODE=release
+      - DATABASE_HOST=mysql
+      - DATABASE_PORT=3306
+      - DATABASE_USERNAME=go_platform
+      - DATABASE_PASSWORD=go_platform_password
+      - DATABASE_DATABASE=go_platform
+      - JWT_SECRET=your-super-secret-jwt-key-change-in-production
+      - LOGGER_LEVEL=info
+      - LOGGER_FORMAT=json
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+      - ./config:/app/config:ro
+    networks:
+      - go-platform-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # MySQL 数据库服务
+  mysql:
+    image: mysql:8.0
+    container_name: go-platform-mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=root_password
+      - MYSQL_DATABASE=go_platform
+      - MYSQL_USER=go_platform
+      - MYSQL_PASSWORD=go_platform_password
+      - MYSQL_CHARSET=utf8mb4
+      - MYSQL_COLLATION=utf8mb4_unicode_ci
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./scripts/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - go-platform-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    command: >
+      --default-authentication-plugin=mysql_native_password
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --innodb-buffer-pool-size=256M
+      --max-connections=200
+
+  # Redis 缓存服务
+  redis:
+    image: redis:7-alpine
+    container_name: go-platform-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+      - ./config/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    networks:
+      - go-platform-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    command: redis-server /usr/local/etc/redis/redis.conf
+
+  # Nginx 反向代理服务
+  nginx:
+    image: nginx:alpine
+    container_name: go-platform-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./config/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./ssl:/etc/nginx/ssl:ro
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      - app
+    networks:
+      - go-platform-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+
+
+  # Jaeger 链路追踪服务
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: go-platform-jaeger
+    ports:
+      - "16686:16686"
+      - "14268:14268"
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    networks:
+      - go-platform-network
+    restart: unless-stopped
+
+# 网络配置
+networks:
+  go-platform-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+# 数据卷配置
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local
+  nginx_logs:
+    driver: local
