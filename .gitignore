@@ -143,4 +143,24 @@ yarn-debug.log*
 yarn-error.log*
 package-lock.json
 /frontend/dist
-/frontend/node_modules 
+/frontend/node_modules
+
+# MySQL data files
+deployments/data/mysql/
+deployments/data/redis/
+
+# Large files
+*.tar
+*.tar.gz
+*.zip
+
+# Backup files
+*.bak
+backup_db*/
+
+# Go platform (if temporary)
+go-platform/
+
+# Test model files
+models/*.onnx
+deployments/data/models/*.onnx 

@@ -38,6 +38,7 @@ const containerRef = ref(null);
 const imageRef = ref(null);
 const canvasRef = ref(null);
 const naturalSize = ref({ width: 0, height: 0 });
+const roi = ref(null);
 
 const connectWebSocket = () => {
   if (!props.taskId || !userStore.token) return;
@@ -55,8 +56,19 @@ const connectWebSocket = () => {
 
   ws.value.onmessage = (event) => {
     const data = JSON.parse(event.data);
-    if (data.detections) {
-      drawDetections(data.detections);
+    
+    if (data.type === 'frame') {
+      // 处理视频帧和检测结果
+      if (data.image) {
+        updateImageFromBase64(data.image);
+      }
+      if (data.detections) {
+        drawDetections(data.detections);
+      }
+    } else if (data.type === 'roi') {
+      // 处理ROI区域信息
+      roi.value = data.data;
+      drawRoi();
     }
   };
 
@@ -67,6 +79,13 @@ const connectWebSocket = () => {
   ws.value.onerror = (error) => {
     console.error('WebSocket error:', error);
   };
+};
+
+const updateImageFromBase64 = (base64Image) => {
+  const image = imageRef.value;
+  if (!image) return;
+  
+  image.src = `data:image/jpeg;base64,${base64Image}`;
 };
 
 const drawDetections = (detections) => {
@@ -91,6 +110,10 @@ const drawDetections = (detections) => {
   const scaleX = displayWidth / naturalWidth;
   const scaleY = displayHeight / naturalHeight;
 
+  // 绘制ROI区域
+  drawRoi();
+
+  // 绘制检测结果
   detections.forEach(det => {
     const [x, y, w, h] = det.box;
     const score = det.score;
@@ -115,10 +138,50 @@ const drawDetections = (detections) => {
   });
 };
 
+const drawRoi = () => {
+  if (!roi.value) return;
+  
+  const canvas = canvasRef.value;
+  const image = imageRef.value;
+  if (!canvas || !image) return;
+
+  const ctx = canvas.getContext('2d');
+  const { clientWidth: displayWidth, clientHeight: displayHeight } = image;
+  const { width: naturalWidth, height: naturalHeight } = naturalSize.value;
+  
+  if (naturalWidth === 0 || naturalHeight === 0) return;
+
+  const scaleX = displayWidth / naturalWidth;
+  const scaleY = displayHeight / naturalHeight;
+
+  // 绘制ROI区域
+  const { x, y, w, h } = roi.value;
+  ctx.strokeStyle = '#ff0000';  // 红色
+  ctx.lineWidth = 2;
+  ctx.setLineDash([5, 3]);  // 虚线样式
+  ctx.strokeRect(x * scaleX, y * scaleY, w * scaleX, h * scaleY);
+  ctx.setLineDash([]);  // 恢复实线
+  
+  // 添加ROI标签
+  ctx.fillStyle = '#ff0000';
+  const text = 'ROI';
+  ctx.font = '14px Arial';
+  const textMetrics = ctx.measureText(text);
+  ctx.fillRect(
+    x * scaleX,
+    y * scaleY - 18,
+    textMetrics.width + 8,
+    18
+  );
+  ctx.fillStyle = 'white';
+  ctx.fillText(text, x * scaleX + 4, y * scaleY - 5);
+};
+
 const onImageLoad = () => {
   const image = imageRef.value;
   if (image) {
     naturalSize.value = { width: image.naturalWidth, height: image.naturalHeight };
+    drawRoi();  // 图像加载后绘制ROI
   }
 };
 
@@ -135,6 +198,7 @@ onMounted(() => {
         canvas.height = image.clientHeight;
         canvas.style.top = `${image.offsetTop}px`;
         canvas.style.left = `${image.offsetLeft}px`;
+        drawRoi();  // 窗口大小变化时重绘ROI
       }
     });
     resizeObserver.observe(containerRef.value);

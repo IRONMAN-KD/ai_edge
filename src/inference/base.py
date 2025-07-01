@@ -23,7 +23,17 @@ class InferenceEngine(ABC):
             model_path: 模型文件路径
             config: 推理配置参数
         """
-        self.model_path = model_path
+        # 处理模型路径，确保兼容本地和容器环境
+        try:
+            from utils.config_parser import ConfigParser
+            config_parser = ConfigParser()
+            self.model_path = config_parser.get_compatible_model_path(model_path)
+            logger.info(f"模型路径(兼容模式): {self.model_path}")
+        except ImportError:
+            # 如果无法导入ConfigParser，则直接使用原始路径
+            self.model_path = model_path
+            logger.info(f"模型路径(原始): {self.model_path}")
+            
         self.config = config or {}
         self.is_loaded = False
         self.performance_stats = {
@@ -40,7 +50,6 @@ class InferenceEngine(ABC):
         self.labels = self.config.get('labels', ['person'])
         
         logger.info(f"初始化推理引擎: {self.__class__.__name__}")
-        logger.info(f"模型路径: {model_path}")
         logger.info(f"配置参数: {self.config}")
     
     @abstractmethod

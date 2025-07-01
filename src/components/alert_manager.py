@@ -127,9 +127,11 @@ class AlertManager:
     def _ensure_image_directory(self):
         """确保图片保存目录存在"""
         image_path = self.alert_config.get('image_path', '/app/alert_images')
+        # 使用兼容路径
+        image_path = self.config.container_config.get_compatible_path(image_path)
         try:
             os.makedirs(image_path, exist_ok=True)
-            logger.info(f"告警图片保存目录: {image_path}")
+            logger.info(f"告警图片保存目录(兼容模式): {image_path}")
         except Exception as e:
             logger.error(f"创建图片保存目录失败: {e}")
     
@@ -182,6 +184,8 @@ class AlertManager:
             
             # 构建保存路径
             image_path = self.alert_config.get('image_path', '/app/alert_images')
+            # 使用兼容路径
+            image_path = self.config.container_config.get_compatible_path(image_path)
             full_path = os.path.join(image_path, filename)
             
             # 在图像上绘制检测结果
@@ -225,6 +229,19 @@ class AlertManager:
             
             # 添加告警信息
             result_image = self._add_alert_info_to_image(result_image, alert_info)
+            
+            # 绘制ROI区域（如果存在）
+            if 'roi' in alert_info.detection:
+                roi = alert_info.detection['roi']
+                if roi and isinstance(roi, dict) and 'x' in roi and 'y' in roi and 'w' in roi and 'h' in roi:
+                    import cv2
+                    # 绘制ROI矩形 - 使用LINE_AA替代LINE_DASHED
+                    x, y, w, h = roi['x'], roi['y'], roi['w'], roi['h']
+                    cv2.rectangle(result_image, (x, y), (x + w, y + h), (0, 255, 0), 2)
+                    
+                    # 添加ROI标签
+                    cv2.putText(result_image, "ROI", (x, y - 10),
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
             
             return result_image
             

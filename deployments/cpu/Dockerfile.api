@@ -6,6 +6,12 @@ LABEL description="AI Edge API服务 - CPU推理版本"
 # 设置工作目录
 WORKDIR /app
 
+# 设置环境变量
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONPATH=/app/src
+ENV PLATFORM=cpu
+ENV CONFIG_PATH=/app/config.yml
+
 # 安装系统依赖
 RUN apt-get update && apt-get install -y \
     gcc \
@@ -24,26 +30,32 @@ RUN apt-get update && apt-get install -y \
     libavformat-dev \
     libswscale-dev \
     libavdevice-dev \
+    libavutil-dev \
+    libavfilter-dev \
     libssl-dev \
     ffmpeg \
+    v4l-utils \
+    python3-dev \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+# 升级pip
+RUN pip install --upgrade pip
 
 # 复制需求文件
 COPY requirements/base.txt requirements/cpu.txt ./
 
-# 安装Python依赖
-RUN pip install  -r base.txt && \
-    pip install  -r cpu.txt
+# 先安装基础依赖
+RUN pip install --no-cache-dir -r base.txt && \
+    pip install --no-cache-dir -r cpu.txt
+
+# 优化：使用opencv-contrib-python获得更完整的编解码器支持
+RUN pip uninstall -y opencv-python opencv-python-headless && \
+    pip install opencv-contrib-python-headless>=4.10.0
 
 # 复制源代码
 COPY src/ ./src/
 COPY deployments/cpu/config.yml ./config.yml
-
-# 设置环境变量
-ENV PYTHONPATH=/app/src
-ENV PLATFORM=cpu
-ENV CONFIG_PATH=/app/config.yml
 
 # 创建必要的目录
 RUN mkdir -p /app/models /app/alert_images /app/logs
@@ -56,7 +68,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 # 启动命令
-CMD ["python", "-m", "uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
-
-# 优化：opencv-python-headless 替换 opencv-python，避免GUI依赖
-RUN pip uninstall -y opencv-python && pip install opencv-python-headless>=4.8.0 
+CMD ["python", "-m", "uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"] 

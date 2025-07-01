@@ -1,4 +1,4 @@
-FROM nvidia/cuda:12.9.1-devel-ubuntu22.04
+FROM nvidia/cuda:12.8.0-devel-ubuntu22.04
 
 LABEL maintainer="AI Edge Team"
 LABEL description="AI Edge API服务 - NVIDIA GPU推理版本"
@@ -30,8 +30,13 @@ RUN apt-get update && apt-get install -y \
     libavformat-dev \
     libswscale-dev \
     libavdevice-dev \
+    libavutil-dev \
+    libavfilter-dev \
     libssl-dev \
     ffmpeg \
+    v4l-utils \
+    python3-pip \
+    python3-dev \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -39,17 +44,18 @@ RUN apt-get update && apt-get install -y \
 RUN ln -s /usr/bin/python3 /usr/bin/python
 
 # 升级pip
-RUN python -m pip install --upgrade pip
+RUN python3 -m pip install --upgrade pip
 
 # 复制需求文件
 COPY requirements/base.txt requirements/nvidia.txt ./
 
-# 安装Python依赖
-RUN pip install --no-cache-dir -r base.txt && \
-    pip install --no-cache-dir -r nvidia.txt
+# 先安装基础依赖
+RUN pip3 install --no-cache-dir -r base.txt && \
+    pip3 install --no-cache-dir -r nvidia.txt
 
-# 优化：opencv-python-headless 替换 opencv-python，避免GUI依赖
-RUN pip uninstall -y opencv-python && pip install opencv-python-headless>=4.8.0
+# 优化：使用opencv-contrib-python获得更完整的编解码器支持
+RUN pip3 uninstall -y opencv-python opencv-python-headless && \
+    pip3 install opencv-contrib-python-headless>=4.10.0
 
 # 复制源代码
 COPY src/ ./src/
@@ -66,4 +72,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 # 启动命令
-CMD ["python", "-m", "uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"] 
+CMD ["python3", "-m", "uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"] 

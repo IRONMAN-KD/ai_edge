@@ -49,6 +49,29 @@ class UserRepository:
         result = self.db.execute_query(query, (email,), fetch='one')
         return User(**result) if result else None
 
+    def get_user_by_token(self, token: str) -> Optional[User]:
+        """通过令牌获取用户
+        
+        Args:
+            token: 用户令牌
+            
+        Returns:
+            User: 用户对象，如果未找到则返回None
+        """
+        # 简单实现：假设token就是用户名，实际应用中应该解析JWT或其他令牌格式
+        try:
+            # 解析token，提取用户名或ID
+            # 这里简化处理，假设token格式为"username:timestamp"
+            if ':' in token:
+                username = token.split(':')[0]
+                return self.get_user_by_username(username)
+            else:
+                # 尝试直接用token作为用户名查询
+                return self.get_user_by_username(token)
+        except Exception as e:
+            print(f"解析token失败: {e}")
+            return None
+
     def verify_password(self, plain_password: str, hashed_password: str) -> bool:
         return pwd_context.verify(plain_password, hashed_password)
 

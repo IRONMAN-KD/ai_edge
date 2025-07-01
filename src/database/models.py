@@ -248,7 +248,7 @@ class AlertBase(BaseModel):
     level: AlertLevel = AlertLevel.MEDIUM
     status: AlertStatus = AlertStatus.PENDING
     confidence: float
-    task_id: int
+    task_id: Optional[int] = None
     task_name: Optional[str] = None
     model_name: Optional[str] = None
     alert_image: Optional[str] = None

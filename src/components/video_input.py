@@ -7,163 +7,339 @@ import cv2
 import time
 import threading
 import queue
-from typing import Optional, Callable, Dict, Any
+import subprocess
+import tempfile
+import os
+import atexit
+import numpy as np
+from typing import Optional, Callable, Dict, Any, Tuple, Union
 from utils.logging import logger
 from utils.config_parser import ConfigParser
+from urllib.parse import urlparse
 
 
-class VideoCapture:
-    """视频捕获器"""
+class EnhancedVideoCapture:
+    """增强版视频捕获类，支持多种后备方案"""
     
-    def __init__(self, source: str, buffer_size: int = 10, reconnect_delay: int = 5, max_reconnect_attempts: int = 10):
+    def __init__(self, source: Union[str, int]):
         self.source = source
-        self.buffer_size = buffer_size
-        self.reconnect_delay = reconnect_delay
-        self.max_reconnect_attempts = max_reconnect_attempts
         self.cap = None
-        self.is_running = False
-        self.frame_queue = queue.Queue(maxsize=buffer_size)
-        self.thread = None
-        self.last_frame = None
-        self.last_frame_time = 0
+        self.is_opened = False
+        self.backend = None
+        self.temp_file = None
+        self.ffmpeg_process = None
+        self.use_fallback = False
         
-        self._init_capture()
+        # 注册清理函数
+        atexit.register(self.cleanup)
+        
+        self._initialize_capture()
     
-    def _init_capture(self, is_reconnecting=False):
-        """初始化视频捕获"""
-        if self.cap:
-            self.cap.release()
-            self.cap = None
-
-        try:
-            # 根据源类型选择不同的初始化方式
-            if self.source.startswith('rtsp://'):
-                self.cap = cv2.VideoCapture(self.source, cv2.CAP_FFMPEG)
-            elif self.source.startswith('/dev/'):
-                self.cap = cv2.VideoCapture(self.source, cv2.CAP_V4L2)
-            else:
-                self.cap = cv2.VideoCapture(self.source)
-            
-            if not self.cap.isOpened():
-                raise RuntimeError(f"无法打开视频源: {self.source}")
-            
-            if not is_reconnecting:
-                logger.info(f"视频源初始化成功: {self.source}")
-            else:
-                logger.info(f"视频源重连成功: {self.source}")
-
-            return True
-            
-        except Exception as e:
-            if not is_reconnecting:
-                logger.error(f"视频源初始化失败: {e}")
-            else:
-                logger.warning(f"视频源重连尝试失败: {e}")
-            self.cap = None
+    def _is_network_stream(self, source: Union[str, int]) -> bool:
+        """检查是否为网络流"""
+        if isinstance(source, int):
             return False
-    
-    def start(self):
-        """开始捕获"""
-        if self.is_running:
-            return
         
-        self.is_running = True
-        self.thread = threading.Thread(target=self._capture_loop, daemon=True)
-        self.thread.start()
-        logger.info("视频捕获线程已启动")
+        parsed = urlparse(str(source))
+        return parsed.scheme in ['rtsp', 'rtmp', 'http', 'https']
+    
+    def _try_opencv_optimized(self) -> bool:
+        """尝试使用优化参数的OpenCV"""
+        try:
+            if self._is_network_stream(self.source):
+                # 尝试不同的后端
+                backends = [
+                    cv2.CAP_FFMPEG,
+                    cv2.CAP_GSTREAMER,
+                    cv2.CAP_ANY
+                ]
+                
+                for backend in backends:
+                    logger.info(f"尝试OpenCV后端: {backend}")
+                    cap = cv2.VideoCapture(str(self.source), backend)
+                    
+                    if backend == cv2.CAP_FFMPEG:
+                        # 为RTSP优化参数
+                        cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
+                        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+                        cap.set(cv2.CAP_PROP_FPS, 25)
+                        
+                        # RTSP特定参数
+                        if str(self.source).startswith('rtsp'):
+                            # 设置网络超时
+                            cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 10000)
+                            cap.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC, 10000)
+                    
+                    if cap.isOpened():
+                        # 测试读取
+                        ret, frame = cap.read()
+                        if ret and frame is not None:
+                            logger.info(f"OpenCV成功，后端: {backend}")
+                            self.cap = cap
+                            self.backend = f"opencv_{backend}"
+                            return True
+                        cap.release()
+            else:
+                # 本地设备或文件
+                self.cap = cv2.VideoCapture(self.source)
+                if self.cap.isOpened():
+                    ret, frame = self.cap.read()
+                    if ret:
+                        self.backend = "opencv_local"
+                        # 重新定位到开始
+                        self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                        return True
+                    self.cap.release()
+                    
+        except Exception as e:
+            logger.error(f"OpenCV初始化失败: {e}")
+            
+        return False
+    
+    def _try_imageio_fallback(self) -> bool:
+        """尝试使用imageio作为后备方案"""
+        try:
+            import imageio
+            
+            if not self._is_network_stream(self.source):
+                return False
+                
+            logger.info("尝试imageio后备方案")
+            
+            # 创建临时文件用于ffmpeg输出
+            self.temp_file = tempfile.NamedTemporaryFile(suffix='.mjpeg', delete=False)
+            self.temp_file.close()
+            
+            # 使用ffmpeg转换流
+            cmd = [
+                'ffmpeg', '-y',
+                '-rtsp_transport', 'tcp',
+                '-i', str(self.source),
+                '-f', 'mjpeg',
+                '-q:v', '5',
+                '-r', '10',  # 降低帧率减少负载
+                self.temp_file.name
+            ]
+            
+            logger.info(f"启动ffmpeg命令: {' '.join(cmd)}")
+            self.ffmpeg_process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                stdin=subprocess.PIPE
+            )
+            
+            # 等待一些数据写入
+            time.sleep(3)
+            
+            # 尝试用imageio读取
+            try:
+                reader = imageio.get_reader(self.temp_file.name, 'ffmpeg')
+                # 测试读取第一帧
+                frame = reader.get_next_data()
+                if frame is not None:
+                    logger.info("imageio后备方案成功")
+                    self.cap = reader
+                    self.backend = "imageio"
+                    self.use_fallback = True
+                    return True
+            except Exception as e:
+                logger.error(f"imageio读取失败: {e}")
+                
+        except ImportError:
+            logger.warning("imageio未安装，跳过此后备方案")
+        except Exception as e:
+            logger.error(f"imageio后备方案失败: {e}")
+            
+        return False
+    
+    def _try_av_fallback(self) -> bool:
+        """尝试使用PyAV作为后备方案"""
+        try:
+            import av
+            
+            if not self._is_network_stream(self.source):
+                return False
+                
+            logger.info("尝试PyAV后备方案")
+            
+            container = av.open(str(self.source), options={
+                'rtsp_transport': 'tcp',
+                'stimeout': '10000000',  # 10秒超时
+            })
+            
+            # 测试获取第一帧
+            for frame in container.decode(video=0):
+                if frame:
+                    logger.info("PyAV后备方案成功")
+                    self.cap = container
+                    self.backend = "pyav"
+                    self.use_fallback = True
+                    return True
+                break
+                
+        except ImportError:
+            logger.warning("PyAV未安装，跳过此后备方案")
+        except Exception as e:
+            logger.error(f"PyAV后备方案失败: {e}")
+            
+        return False
+    
+    def _initialize_capture(self):
+        """初始化视频捕获，按优先级尝试不同方案"""
+        logger.info(f"初始化视频源: {self.source}")
+        
+        # 方案1: 优化的OpenCV
+        if self._try_opencv_optimized():
+            self.is_opened = True
+            return
+            
+        # 方案2: imageio后备
+        if self._try_imageio_fallback():
+            self.is_opened = True
+            return
+            
+        # 方案3: PyAV后备
+        if self._try_av_fallback():
+            self.is_opened = True
+            return
+            
+        logger.error("所有视频捕获方案都失败了")
+        self.is_opened = False
+    
+    def isOpened(self) -> bool:
+        """检查是否成功打开"""
+        return self.is_opened
+    
+    def read(self) -> Tuple[bool, Optional[np.ndarray]]:
+        """读取一帧"""
+        if not self.is_opened or self.cap is None:
+            return False, None
+            
+        try:
+            if self.backend == "imageio":
+                try:
+                    frame = self.cap.get_next_data()
+                    return True, frame
+                except Exception:
+                    return False, None
+                    
+            elif self.backend == "pyav":
+                try:
+                    for frame in self.cap.decode(video=0):
+                        return True, frame.to_ndarray(format='bgr24')
+                    return False, None
+                except Exception:
+                    return False, None
+                    
+            else:  # OpenCV
+                return self.cap.read()
+                
+        except Exception as e:
+            logger.error(f"读取帧失败: {e}")
+            return False, None
+    
+    def get(self, prop):
+        """获取属性"""
+        if not self.is_opened or self.cap is None:
+            return 0
+            
+        if hasattr(self.cap, 'get'):
+            return self.cap.get(prop)
+        return 0
+    
+    def set(self, prop, value):
+        """设置属性"""
+        if not self.is_opened or self.cap is None:
+            return False
+            
+        if hasattr(self.cap, 'set'):
+            return self.cap.set(prop, value)
+        return False
+    
+    def cleanup(self):
+        """清理资源"""
+        if self.cap is not None:
+            if hasattr(self.cap, 'release'):
+                self.cap.release()
+            elif hasattr(self.cap, 'close'):
+                self.cap.close()
+            self.cap = None
+            
+        if self.ffmpeg_process:
+            try:
+                self.ffmpeg_process.terminate()
+                self.ffmpeg_process.wait(timeout=5)
+            except:
+                self.ffmpeg_process.kill()
+            self.ffmpeg_process = None
+            
+        if self.temp_file and os.path.exists(self.temp_file.name):
+            try:
+                os.unlink(self.temp_file.name)
+            except:
+                pass
+            self.temp_file = None
+    
+    def release(self):
+        """释放资源"""
+        self.cleanup()
+        self.is_opened = False
+
+# 保持原有的VideoCapture类作为旧版兼容，但使用增强版实现
+class VideoCapture(EnhancedVideoCapture):
+    """原有VideoCapture类的兼容接口"""
+    
+    def __init__(self, source, threaded=False):
+        self.threaded = threaded
+        self.last_frame = None
+        self.frame_lock = threading.Lock()
+        self.thread = None
+        self.running = False
+        
+        super().__init__(source)
+        
+        if self.threaded and self.is_opened:
+            self.start_thread()
+    
+    def start_thread(self):
+        """启动读取线程"""
+        if self.thread is None or not self.thread.is_alive():
+            self.running = True
+            self.thread = threading.Thread(target=self._read_thread)
+            self.thread.daemon = True
+            self.thread.start()
+    
+    def _read_thread(self):
+        """后台读取线程"""
+        while self.running and self.is_opened:
+            ret, frame = super().read()
+            if ret:
+                with self.frame_lock:
+                    self.last_frame = frame
+            time.sleep(0.03)  # ~30fps
+    
+    def read(self):
+        """读取帧（支持线程模式）"""
+        if self.threaded:
+            with self.frame_lock:
+                if self.last_frame is not None:
+                    return True, self.last_frame.copy()
+                return False, None
+        else:
+            return super().read()
     
     def stop(self):
-        """停止捕获"""
-        self.is_running = False
-        if self.thread:
-            self.thread.join(timeout=2.0)
-        
-        if self.cap:
-            self.cap.release()
-        
-        logger.info("视频捕获已停止")
-    
-    def _capture_loop(self):
-        """捕获循环"""
-        reconnect_attempts = 0
-        while self.is_running:
-            try:
-                if self.cap is None or not self.cap.isOpened():
-                    raise ConnectionError("视频捕获未打开或已断开")
+        """停止线程和释放资源"""
+        self.running = False
+        if self.thread and self.thread.is_alive():
+            self.thread.join(timeout=1)
+        self.cleanup()
 
-                ret, frame = self.cap.read()
-                if not ret:
-                    logger.warning(f"无法从源 {self.source} 读取视频帧，尝试重连...")
-                    raise ConnectionError("无法读取视频帧")
-                
-                # 重置重连计数器
-                reconnect_attempts = 0
-                
-                # 更新最新帧
-                self.last_frame = frame
-                self.last_frame_time = time.time()
-                
-                # 添加到队列（非阻塞）
-                try:
-                    self.frame_queue.put_nowait(frame)
-                except queue.Full:
-                    # 队列满时，移除最旧的帧
-                    try:
-                        self.frame_queue.get_nowait()
-                        self.frame_queue.put_nowait(frame)
-                    except queue.Empty:
-                        pass
-                
-            except Exception as e:
-                logger.error(f"视频捕获错误: {e}")
-                
-                if isinstance(e, ConnectionError):
-                    self.cap.release()
-                    self.cap = None
-                    
-                    while self.is_running and reconnect_attempts < self.max_reconnect_attempts:
-                        reconnect_attempts += 1
-                        logger.info(f"第 {reconnect_attempts}/{self.max_reconnect_attempts} 次尝试重连至 {self.source}...")
-                        time.sleep(self.reconnect_delay)
-                        if self._init_capture(is_reconnecting=True):
-                            logger.info(f"成功重连至 {self.source}")
-                            break
-                        else:
-                            logger.warning(f"重连失败，将在 {self.reconnect_delay} 秒后重试...")
-                    
-                    if self.cap is None or not self.cap.isOpened():
-                        logger.error(f"重连 {self.max_reconnect_attempts} 次后依然失败，停止捕获线程。")
-                        self.is_running = False
-                else:
-                    # 对于其他类型的错误，短暂休眠后继续
-                    time.sleep(0.1)
-    
-    def get_frame(self) -> Optional[tuple]:
-        """获取最新帧"""
-        if self.last_frame is not None:
-            return self.last_frame, self.last_frame_time
-        return None
-    
-    def get_frame_from_queue(self, timeout: float = 0.1) -> Optional[tuple]:
-        """从队列获取帧"""
-        try:
-            frame = self.frame_queue.get(timeout=timeout)
-            return frame, time.time()
-        except queue.Empty:
-            return None
-    
-    def get_properties(self) -> Dict[str, Any]:
-        """获取视频属性"""
-        if not self.cap:
-            return {}
-        
-        return {
-            'width': int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
-            'height': int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
-            'fps': self.cap.get(cv2.CAP_PROP_FPS),
-            'frame_count': int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT)),
-            'source': self.source
-        }
+# 向后兼容的工厂函数
+def create_video_capture(source, threaded=False):
+    """创建视频捕获对象的工厂函数"""
+    return VideoCapture(source, threaded=threaded)
 
 
 class VideoProcessor:
@@ -188,16 +364,9 @@ class VideoProcessor:
         """初始化视频捕获"""
         try:
             source = self.video_config.get('source', '0')
-            buffer_size = self.video_config.get('buffer_size', 10)
-            reconnect_delay = self.video_config.get('reconnect_delay_seconds', 5)
-            max_attempts = self.video_config.get('max_reconnect_attempts', 10)
             
-            self.capture = VideoCapture(
-                source, 
-                buffer_size,
-                reconnect_delay=reconnect_delay,
-                max_reconnect_attempts=max_attempts
-            )
+            # 使用兼容的新接口
+            self.capture = VideoCapture(source, threaded=True)
             
             # 设置视频属性
             self._set_video_properties()
@@ -211,22 +380,21 @@ class VideoProcessor:
     def _set_video_properties(self):
         """设置视频属性"""
         try:
-            cap = self.capture.cap
-            if not cap:
+            if not self.capture.isOpened():
                 return
             
             # 设置分辨率
             width = self.video_config.get('width', 1920)
             height = self.video_config.get('height', 1080)
-            cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
-            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+            self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+            self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
             
             # 设置帧率
             target_fps = self.video_config.get('fps', 30)
-            cap.set(cv2.CAP_PROP_FPS, target_fps)
+            self.capture.set(cv2.CAP_PROP_FPS, target_fps)
             
             # 设置缓冲区大小
-            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+            self.capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
             
             logger.info(f"视频属性设置完成: {width}x{height} @ {target_fps}fps")
             
@@ -245,9 +413,6 @@ class VideoProcessor:
         self.is_running = True
         self.start_time = time.time()
         self.frame_count = 0
-        
-        # 启动视频捕获
-        self.capture.start()
         
         # 启动处理线程
         self.processing_thread = threading.Thread(
@@ -275,11 +440,12 @@ class VideoProcessor:
         while self.is_running:
             try:
                 # 获取帧
-                frame_data = self.capture.get_frame_from_queue(timeout=0.1)
-                if frame_data is None:
+                ret, frame = self.capture.read()
+                if not ret or frame is None:
+                    time.sleep(0.03)  # 短暂等待
                     continue
                 
-                frame, timestamp = frame_data
+                timestamp = time.time()
                 
                 # 更新统计
                 self.frame_count += 1
@@ -297,8 +463,12 @@ class VideoProcessor:
     
     def get_frame(self) -> Optional[tuple]:
         """获取当前帧"""
-        if self.capture:
-            return self.capture.get_frame()
+        if not self.capture:
+            return None
+        
+        ret, frame = self.capture.read()
+        if ret:
+            return frame, time.time()
         return None
     
     def get_performance_stats(self) -> Dict[str, Any]:
@@ -314,16 +484,23 @@ class VideoProcessor:
     
     def get_video_info(self) -> Dict[str, Any]:
         """获取视频信息"""
-        if self.capture:
-            return self.capture.get_properties()
-        return {}
+        if not self.capture:
+            return {}
+        
+        return {
+            'width': int(self.capture.get(cv2.CAP_PROP_FRAME_WIDTH)),
+            'height': int(self.capture.get(cv2.CAP_PROP_FRAME_HEIGHT)),
+            'fps': self.capture.get(cv2.CAP_PROP_FPS),
+            'frame_count': int(self.capture.get(cv2.CAP_PROP_FRAME_COUNT)),
+            'source': self.video_config.get('source', '0')
+        }
     
     def is_healthy(self) -> bool:
         """检查视频源是否健康"""
-        if not self.capture or not self.capture.cap:
+        if not self.capture:
             return False
         
-        return self.capture.cap.isOpened()
+        return self.capture.isOpened()
 
 
 class VideoInputManager:

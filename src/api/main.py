@@ -14,6 +14,7 @@ from typing import Optional, Dict, Any, List
 from contextlib import asynccontextmanager
 import time
 import concurrent.futures
+import base64
 
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends, APIRouter, status, WebSocket, WebSocketDisconnect, Query, Body
 from fastapi.middleware.cors import CORSMiddleware
@@ -1057,17 +1058,121 @@ async def mjpeg_video_stream(task_id: int):
 # ==================== WebSocket支持 ====================
 
 @app.websocket("/ws/tasks/{task_id}/stream")
-async def websocket_task_stream(websocket: WebSocket, task_id: int):
+async def websocket_task_stream(websocket: WebSocket, task_id: int, token: str = Query(None)):
     """任务实时流WebSocket"""
     await websocket.accept()
+    
+    # 验证token
+    if token:
+        try:
+            user = user_repository.get_user_by_token(token)
+            if not user:
+                logger.warning(f"WebSocket验证失败: 无效的token {token}")
+                await websocket.close(code=1008, reason="无效的token")
+                return
+        except Exception as e:
+            logger.error(f"WebSocket验证失败: {e}")
+            await websocket.close(code=1008, reason="验证失败")
+            return
+    else:
+        # 如果不需要强制验证，可以注释下面三行
+        # logger.warning(f"WebSocket连接未提供token")
+        # await websocket.close(code=1008, reason="未提供token")
+        # return
+        pass
+    
     try:
+        # 获取任务信息
+        task = task_repository.get_task_by_id(task_id)
+        if not task:
+            await websocket.close(code=1008, reason="任务不存在")
+            return
+            
+        if not task.video_sources:
+            await websocket.close(code=1008, reason="任务没有视频源")
+            return
+            
+        # 获取视频源
+        first_source = task.video_sources[0]
+        if isinstance(first_source, dict):
+            video_source_url = first_source.get('url', first_source.get('source', ''))
+            roi = first_source.get('roi', None)
+        elif isinstance(first_source, str):
+            video_source_url = first_source
+            roi = None
+        else:
+            await websocket.close(code=1008, reason="无效的视频源格式")
+            return
+            
+        # 创建视频捕获对象
+        cap = cv2.VideoCapture(video_source_url)
+        if not cap.isOpened():
+            await websocket.close(code=1008, reason="无法打开视频源")
+            return
+            
+        # 获取模型
+        model = None
+        if task.model_id:
+            model_info = model_repository.get_model_by_id(task.model_id)
+            if model_info and model_info.file_path and os.path.exists(model_info.file_path):
+                try:
+                    # 使用推理工厂创建模型
+                    from inference.factory import InferenceFactory
+                    model = InferenceFactory.create_engine(
+                        platform="auto",
+                        model_path=model_info.file_path,
+                        config={"labels": model_info.labels}
+                    )
+                except Exception as e:
+                    logger.error(f"模型加载失败: {e}")
+        
+        # 发送ROI信息
+        if roi:
+            await websocket.send_json({
+                "type": "roi",
+                "data": roi
+            })
+        
+        # 主循环
         while True:
-            # 这里应该实现实时视频流处理
-            # 简化版本只发送心跳
-            await websocket.send_json({"type": "heartbeat", "task_id": task_id})
-            await asyncio.sleep(1)
+            ret, frame = cap.read()
+            if not ret:
+                # 尝试重新连接
+                cap.release()
+                cap = cv2.VideoCapture(video_source_url)
+                await asyncio.sleep(1)
+                continue
+                
+            # 执行推理
+            detections = []
+            if model:
+                try:
+                    detections, _ = model.detect(frame)
+                except Exception as e:
+                    logger.error(f"推理失败: {e}")
+            
+            # 编码图像
+            _, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+            base64_image = base64.b64encode(buffer).decode('utf-8')
+            
+            # 发送数据
+            await websocket.send_json({
+                "type": "frame",
+                "image": base64_image,
+                "detections": detections,
+                "timestamp": time.time()
+            })
+            
+            # 控制帧率
+            await asyncio.sleep(0.1)  # 约10fps
+            
     except WebSocketDisconnect:
         logger.info(f"WebSocket连接断开: task_id={task_id}")
+    except Exception as e:
+        logger.error(f"WebSocket错误: {e}")
+    finally:
+        if 'cap' in locals() and cap.isOpened():
+            cap.release()
 
 # 注册API路由
 app.include_router(api_router)

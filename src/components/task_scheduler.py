@@ -67,7 +67,10 @@ class TaskExecutor:
             if not os.path.isabs(model_path):
                 # 如果是相对路径，添加模型基础目录
                 model_path = os.path.join('/app/models', model_path)
-            logger.info(f"模型路径: {model_path}")
+            
+            # 使用ConfigParser的兼容路径处理方法，适配本地和容器环境
+            model_path = self.config.get_compatible_model_path(model_path)
+            logger.info(f"模型路径(兼容模式): {model_path}")
             
             platform = self.config.get('platform', 'cpu_arm')
             # 如果platform是字典，提取name字段
@@ -219,17 +222,47 @@ class TaskExecutor:
         if not detections:
             return
         
+        # 获取模型标签
+        model_repo = ModelRepository()
+        model = model_repo.get_model_by_id(self.task.model_id)
+        model_labels = []
+        if model and hasattr(model, 'labels') and model.labels:
+            model_labels = model.labels
+        
+        # 获取ROI区域（如果有）
+        roi = None
+        for source in self.task.video_sources:
+            if isinstance(source, dict) and source.get('url') == source_url:
+                roi = source.get('roi')
+                break
+        
         for detection in detections:
-            class_name = detection.get('class_name', 'unknown')
             confidence = detection.get('confidence', 0.0)
+            class_id = detection.get('class_id', 0)
             
-            # 修复：确保使用任务配置的告警冷却时间
-            alert_key = f"{self.task.id}_{source_url}_{class_name}"
+            # 使用模型标签获取类别名称
+            if model_labels and 0 <= class_id < len(model_labels):
+                class_name = model_labels[class_id]
+            else:
+                class_name = detection.get('class_name', f"class_{class_id}")
+            
+            # 添加类别名称到检测结果
+            detection['class_name'] = class_name
+            
+            # 添加ROI区域到检测结果
+            if roi:
+                detection['roi'] = roi
+            
+            # 生成告警键
+            alert_key = f"task_{self.task.id}_{class_name}"
+            
+            # 检查防抖
             debounce_interval = self.task.alert_debounce_interval
-            logger.debug(f"检查告警是否需要防抖: {alert_key}, 冷却时间: {debounce_interval}秒")
             if self.alert_manager.should_debounce_alert(alert_key, debounce_interval):
-                logger.debug(f"告警被防抖过滤: {class_name}, 冷却时间: {debounce_interval}秒")
+                logger.debug(f"告警被防抖过滤: {class_name}")
                 continue
+            
+            logger.info(f"检测到对象: {class_name}, 置信度: {confidence:.2f}")
             
             try:
                 alert_image_path = self.alert_manager.save_alert_image(

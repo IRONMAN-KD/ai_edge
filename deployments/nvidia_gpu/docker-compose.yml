@@ -33,9 +33,7 @@ services:
 
   # 后端API服务 (GPU推理)
   api:
-    build:
-      context: ../../
-      dockerfile: deployments/nvidia_gpu/Dockerfile.api
+    image: ai-edge-backend-nvidia
     container_name: ai_edge_api_gpu
     environment:
       - PLATFORM=nvidia_gpu

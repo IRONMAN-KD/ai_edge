@@ -15,18 +15,17 @@ module.exports = defineConfig({
     proxy: {
       // Proxy /alert_images to the backend server for alert images
       '/alert_images': {
-        target: 'http://localhost:5001',
+        target: 'http://localhost:8000',
         changeOrigin: true,
       },
       // Proxy all API calls starting with /api to the backend
       '/api': {
-        target: 'http://localhost:5001',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ''),
+        target: 'http://localhost:8000',
+        changeOrigin: true
       },
       // Add this new rule for WebSocket
       '/ws': {
-        target: 'ws://localhost:5001',
+        target: 'ws://localhost:8000',
         ws: true,
       }
     }

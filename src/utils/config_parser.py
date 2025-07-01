@@ -27,6 +27,43 @@ class ContainerConfig:
     def get_config_volume_path(self) -> str:
         """获取容器内配置文件路径"""
         return os.environ.get('CONFIG_VOLUME_PATH', '/app/config')
+    
+    def get_compatible_path(self, container_path: str) -> str:
+        """获取兼容本地和容器环境的路径
+        
+        Args:
+            container_path: 容器内路径，如 /app/models/person.onnx
+            
+        Returns:
+            str: 根据当前环境返回兼容的路径
+        """
+        if not self.container_env and container_path.startswith('/app/'):
+            # 本地环境，将 /app/ 替换为当前目录
+            relative_path = container_path.replace('/app/', '')
+            return os.path.join(os.getcwd(), relative_path)
+        return container_path
+    
+    def ensure_directory_exists(self, path: str) -> str:
+        """确保目录存在，如果不存在则创建
+        
+        Args:
+            path: 目录路径
+            
+        Returns:
+            str: 创建后的目录路径
+        """
+        # 如果是容器路径，先转换为兼容路径
+        compatible_path = self.get_compatible_path(path)
+        
+        # 确保目录存在
+        if not os.path.exists(compatible_path):
+            try:
+                os.makedirs(compatible_path, exist_ok=True)
+                logger.info(f"创建目录: {compatible_path}")
+            except Exception as e:
+                logger.error(f"创建目录失败: {compatible_path}, 错误: {e}")
+        
+        return compatible_path
 
 
 class ConfigParser:
@@ -166,6 +203,33 @@ class ConfigParser:
     def get_section(self, section_name: str) -> Optional[Dict[str, Any]]:
         """获取配置节"""
         return self.config.get(section_name)
+    
+    def get_compatible_model_path(self, model_path: str) -> str:
+        """获取兼容本地和容器环境的模型路径
+        
+        Args:
+            model_path: 原始模型路径
+            
+        Returns:
+            str: 兼容的模型路径
+        """
+        return self.container_config.get_compatible_path(model_path)
+    
+    def get_alert_image_path(self) -> str:
+        """获取告警图片保存路径，并确保目录存在
+        
+        Returns:
+            str: 告警图片保存路径
+        """
+        # 获取配置中的告警图片路径
+        alert_config = self.get_alert_config()
+        alert_image_path = alert_config.get('image_path', '/app/alert_images')
+        
+        # 转换为兼容路径并确保目录存在
+        compatible_path = self.container_config.get_compatible_path(alert_image_path)
+        self.container_config.ensure_directory_exists(compatible_path)
+        
+        return compatible_path
     
     def is_container_env(self) -> bool:
         """是否为容器环境"""
